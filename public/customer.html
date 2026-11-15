@@ -9,10 +9,10 @@
     <div class=footer-col>
       <h4>Danh mục sự kiện</h4>
       <ul class=footer-links>
-        <li><a href="#" onclick="tab='open';draw();return false">🎵 Đại nhạc hội &amp; Live Concert</a></li>
-        <li><a href="#" onclick="tab='open';draw();return false">⛓️ Hội thảo Web3 &amp; Công nghệ</a></li>
-        <li><a href="#" onclick="tab='open';draw();return false">🎸 Indie Music &amp; Sân khấu nghệ thuật</a></li>
-        <li><a href="#" onclick="tab='market';draw();return false">🔄 Sàn giao dịch vé thứ cấp P2P</a></li>
+        <li><a href="#" onclick="tab='open';draw();return false">Đại nhạc hội &amp; Live Concert</a></li>
+        <li><a href="#" onclick="tab='open';draw();return false">Hội thảo Web3 &amp; Công nghệ</a></li>
+        <li><a href="#" onclick="tab='open';draw();return false">Indie Music &amp; Sân khấu nghệ thuật</a></li>
+        <li><a href="#" onclick="tab='market';draw();return false">Chợ vé</a></li>
       </ul>
     </div>
     <div class=footer-col>
@@ -29,7 +29,7 @@
 </footer>
 <script src=app.js></script><script>
 let tab='open',ev=[],tk=[],mk=[],hs=[];
-const T={open:'🎟️ Sự kiện đang mở bán',mine:'🎫 Vé của tôi (E-Ticket)',market:'🔄 Chợ vé thứ cấp (P2P)',history:'⛓️ Lịch sử On-chain'};
+const T={open:'Sự kiện đang mở bán',mine:'Vé của tôi',market:'Chợ vé',history:'Lịch sử On-chain'};
 (async()=>{window.me=await init('customer');if(me)load()})();
 async function load(){[ev,tk,mk,hs]=await Promise.all([api('events'),api('tickets'),api('market'),api('history')]);draw()}
 const hit=o=>(o.name+' '+o.venue).toLowerCase().includes($('#q').value.trim().toLowerCase());
@@ -44,7 +44,7 @@ function renderHero(list){
   <div class="hero-content">
    <div class="hero-tag">${isCancelled?'❌ SỰ KIỆN ĐÃ HỦY':'🔥 ĐẠI NHẠC HỘI TIÊU ĐIỂM · '+th.tag}</div>
    <h2 class="hero-title">${esc(topEv.name)}</h2>
-   <p class="hero-desc">Bảo chứng bởi Avalanche NFT. Mã QR động xoay mỗi 20 giây chống vé chụp màn hình. Mua vé an toàn 100% với xác thực OTP Email.${topEv.max_per_user>0?` (Quy định: Tối đa ${topEv.max_per_user} vé/tài khoản)`:''}</p>
+   <p class="hero-desc">${topEv.max_per_user>0?` (Quy định: Tối đa ${topEv.max_per_user} vé/tài khoản)`:''}</p>
    <div class="hero-meta">
     <div class="hero-meta-item">📅 <b>${dmy(topEv.date)}</b></div>
     <div class="hero-meta-item">📍 <b>${esc(topEv.venue)}</b></div>
@@ -57,7 +57,7 @@ function renderHero(list){
       `<button class="btn" ${topEv.remain>0?'':'disabled'} onclick="confirmBuy('buy',{event:${topEv.id}},${topEv.id},'open')">
        ${topEv.remain>0?'🛒 Mua vé ngay':'Hết vé'}
       </button>`}
-    <button class="btn ghost" onclick="viewDetail(${topEv.id},'open')">👁️ Xem chi tiết show</button>
+    <button class="btn ghost" onclick="viewDetail(${topEv.id},'open')">👁️ Chi tiết</button>
    </div>
   </div>
   <div class="hero-poster-preview">
@@ -132,7 +132,7 @@ function draw(){
     <div class=event-details>
      <div class=event-details-row>📅 <span>${dmy(t.date)}</span></div>
      <div class=event-details-row>📍 <span>${esc(t.venue)}</span></div>
-     ${isRefunded?`<div class=event-details-row><span style="color:#22c55e;font-weight:600">↩️ Tiền vé đã hoàn 100% (${vnd(t.orig)}) vào ví</span></div>`:''}
+     ${isRefunded?`<div class=event-details-row><span style="color:#22c55e;font-weight:600">Tiền vé đã hoàn 100% (${vnd(t.orig)}) vào ví</span></div>`:''}
     </div>
     <div class=ticket-notch-divider><div class=ticket-dashed-line></div></div>
     <div class=card-action-bar style="border-top:none;padding-top:0">
@@ -140,13 +140,13 @@ function draw(){
       <span class=price-label>Giá gốc</span>
       <span class=price-amount style="font-size:16px">${vnd(t.orig)}</span>
      </div>
-     <div>${isRefunded?'<span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border-color:rgba(239,68,68,0.3)">↩️ Đã hoàn tiền 100%</span>':t.used===1?'<span class="badge ok">✅ Đã check-in</span>':t.listed?`<span class=badge>🔄 Rao bán ${vnd(t.listed)}</span>`:'<span class="badge ok">🎫 Đang sở hữu</span>'}</div>
+     <div>${isRefunded?'<span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border-color:rgba(239,68,68,0.3)">Đã hoàn tiền 100%</span>':t.used===1?'<span class="badge ok">✅ Đã check-in</span>':t.listed?`<span class=badge>🔄 Rao bán ${vnd(t.listed)}</span>`:'<span class="badge ok">🎫 Đang sở hữu</span>'}</div>
     </div>
     <div class=card-btn-group style="justify-content:flex-end;margin-top:10px">
      <button class="btn sm ghost" onclick="viewDetail(${t.id},'mine')">👁️ Chi tiết</button>
-     ${isRefunded?'':t.used?'':`<button class="btn green sm" onclick=qr(${t.id})>📱 Mã QR vào cổng</button>
-       ${t.listed?`<button class="btn sm red" onclick=unlist(${t.id})>❌ Hủy bán</button>`:`<button class="btn sm ghost" onclick=resale(${t.id})>🔄 Bán lại</button>`}`}
-     ${t.token_id?`<button class="btn sm ghost" onclick=viewChain(${t.id})>🔗 On-chain</button>`:''}
+     ${isRefunded?'':t.used?'':`<button class="btn green sm" onclick=qr(${t.id})>Mã QR vào cổng</button>
+       ${t.listed?`<button class="btn sm red" onclick=unlist(${t.id})>❌ Hủy bán</button>`:`<button class="btn sm ghost" onclick=resale(${t.id})>Bán lại</button>`}`}
+     ${t.token_id?`<button class="btn sm ghost" onclick=viewChain(${t.id})>On-chain</button>`:''}
     </div>
    </div>
   </article>`;
@@ -162,7 +162,7 @@ function draw(){
      <div class=month>${db.m}</div>
      <div class=day>${db.d}</div>
     </div>
-    <span class="poster-tag">🔄 CHỢ VÉ THỨ CẤP</span>
+    <span class="poster-tag">CHỢ VÉ</span>
     <span class=event-poster-genre>${th.icon} ${th.tag}</span>
    </div>
    <div class=card-content>
@@ -204,7 +204,7 @@ function viewDetail(id,src){
 
  openModal(`
   <div class="modal-banner" style="background-image:linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.85) 100%), url('${esc(imgUrl)}')">
-   <div class=modal-banner-tag>${src==='open'?'🎪 Sự kiện chính thức':src==='mine'?'🎫 Vé của bạn':'🔄 Chợ vé thứ cấp'}</div>
+   <div class=modal-banner-tag>${src==='open'?'Sự kiện chính thức':src==='mine'?'Vé của bạn':'Chợ vé'}</div>
   </div>
   <h2>${esc(o.name)}</h2>
   <table class=info>
@@ -226,7 +226,7 @@ function viewDetail(id,src){
    <button class="btn ghost" onclick=closeModal()>Đóng</button>
    ${src==='open'&&!isCancelled&&o.remain>0?(isLimitReached?`<button class="btn" disabled style="background:#475569;border-color:#475569;cursor:not-allowed">Đã đạt giới hạn (${maxPerUser} vé)</button>`:`<button class=btn onclick="confirmBuy('buy',{event:${o.id}},${o.id},'open')">🛒 Mua vé ngay</button>`):''}
    ${src==='market'&&o.owner!==me.id&&!isCancelled?(isLimitReached?`<button class="btn" disabled style="background:#475569;border-color:#475569;cursor:not-allowed">Đã đạt giới hạn (${maxPerUser} vé)</button>`:`<button class=btn onclick="confirmBuy('buy-resale',{ticket:${o.id}},${o.id},'market')">🛒 Mua lại vé</button>`):''}
-   ${src==='mine'&&!o.used?`<button class="btn green" onclick="qr(${o.id})">📱 Mở mã QR vào cổng</button>`:''}
+   ${src==='mine'&&!o.used?`<button class="btn green" onclick="qr(${o.id})">Mở mã QR vào cổng</button>`:''}
   </div>`);
 }
 
@@ -249,8 +249,8 @@ function confirmBuy(path,body,id,src){
    <tr><th>Ngân hàng</th><td>${esc(me.bank)}</td></tr>
    <tr><th>Số dư ví</th><td>${vnd(me.balance)} ${hasEnoughBal?'':`<span class="note err">(Thiếu ${vnd(price-me.balance)})</span>`}</td></tr>
   </table>
-  ${hasEnoughBal?'':`<p class="note err">⚠️ Số dư ví không đủ. Vui lòng bấm Nạp tiền trước khi mua.</p>`}
-  <p class=note>Bước 1: Kiểm tra thông tin. Sau khi bấm xác nhận, hệ thống sẽ gửi mã OTP về email của bạn để xác thực thanh toán.</p>
+  ${hasEnoughBal?'':`<p class="note err">⚠️ Số dư ví không đủ. Vui lòng Nạp tiền trước khi mua.</p>`}
+  <p class=note>Note: Kiểm tra thông tin. Sau khi bấm xác nhận, hệ thống sẽ gửi mã OTP về email của bạn để xác thực thanh toán.</p>
   <div class=chk><input type=checkbox id=ag onchange="$('#ok').disabled=!this.checked||!${hasEnoughBal}"><span>Tôi đã đọc, hiểu và cam kết với <span class=tip><a href=terms.html target=_blank>điều khoản và chính sách</a><a class=pop href=terms.html target=_blank>Mở Điều khoản &amp; Chính sách ↗</a></span> của AVA-TIX.</span></div>
   <div class=row><button class="btn ghost" onclick=closeModal()>Hủy</button><button id=ok class=btn disabled>${hasEnoughBal?'Xác nhận &amp; Gửi mã OTP':'Số dư không đủ'}</button></div>`);
 
@@ -331,7 +331,7 @@ function renderOtpStep(path,body,o,price,otpRes){
 
 function resale(id){
  const t=tk.find(x=>x.id===id),max=Math.floor(t.orig*1.1);
- openModal(`<h2>Bán lại vé #${id}</h2><p>Giá gốc: <b>${vnd(t.orig)}</b><br>Quy định chống phe vé: giá bán tối đa <b>${vnd(max)}</b> (giá gốc + 10%). Phí sàn 5% trên giá bán.</p>
+ openModal(`<h2>Bán lại vé #${id}</h2><p>Giá gốc: <b>${vnd(t.orig)}</b><br>Quy định: giá bán tối đa <b>${vnd(max)}</b> (giá gốc + 10%). Phí sàn 5% trên giá bán.</p>
  <label>Giá bán lại (VNĐ)</label><input id=rp inputmode=numeric value="${dots(t.orig)}" oninput=money(this)><div class=row><button class="btn ghost" onclick=closeModal()>Hủy</button><button id=ok class=btn>Đăng bán</button></div>`);
  $('#ok').onclick=async()=>{
   $('#ok').disabled=true;
