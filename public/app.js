@@ -36,6 +36,44 @@ function showChainInfo(){
     <p class=note>Mô hình Relayer: mọi giao dịch mua vé, bán lại và check-in được ghi nhận lên smart contract mà bạn không cần trả phí gas.</p>
     <div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button></div>`);
 }
+function qr(id){
+  openModal(`<h2>Mã QR vào cổng</h2>
+    <div class=qrbox id=qb><div style="padding:22px;color:var(--text-muted)">⏳ Đang tạo mã QR động...</div></div>
+    <p class="note" id=cd style="text-align:center"></p>
+    <div class=row><input id=qt readonly class=mono style="flex:1"><button class="btn sm ghost" id=cp>Copy mã</button></div>
+    <p class=note>Mã tự đổi mỗi 20 giây. Ảnh chụp màn hình sẽ hết hạn.</p>
+    <div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button></div>`);
+  const cp = $('#cp');
+  if(cp) cp.onclick = () => { navigator.clipboard?.writeText($('#qt')?.value || ''); toast('Đã copy mã QR!'); };
+
+  const g = async () => {
+    try {
+      const r = await api('qr/' + id);
+      const qb = $('#qb'); if(!qb) return;
+      qb.innerHTML = r.svg;
+      if($('#qt')) $('#qt').value = r.token;
+      let s = r.left;
+      clearInterval(window.tm);
+      window.tm = setInterval(() => {
+        if(!$('#cd')) return clearInterval(window.tm);
+        $('#cd').textContent = 'Đổi mã sau ' + s + ' giây';
+        if(--s < 0) g();
+      }, 1000);
+    } catch(e) {
+      const qb = $('#qb');
+      if(qb) {
+        qb.innerHTML = `<div style="padding:22px 14px;text-align:center">
+          <div style="font-size:36px;margin-bottom:8px">⚠️</div>
+          <div style="font-weight:700;color:#dc2626;font-size:15px;margin-bottom:6px">Không thể tạo mã QR</div>
+          <div class="note" style="color:var(--text);font-size:13.5px">${esc(e.message)}</div>
+        </div>`;
+      }
+      if($('#cd')) $('#cd').textContent = '';
+      toast(e.message, 1);
+    }
+  };
+  g();
+}
 function renderHistory(rows){
   const labels={topup:'💰 Nạp tiền',buy:'🎟️ Mua vé',sale:'💵 Bán vé',list:'🔄 Đăng bán lại',scan:'📷 Soát vé',refund:'↩️ Hoàn tiền',verify_email:'✉️ Xác thực Email',security:'🔐 Bảo mật / Đổi MK'};
   if(!rows.length)return '<div class="card empty">Chưa có giao dịch nào trong lịch sử.</div>';

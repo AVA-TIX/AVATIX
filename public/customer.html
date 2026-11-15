@@ -337,11 +337,6 @@ function resale(id){
  };
 }
 async function unlist(id){try{await api('unlist',{ticket:id});toast('Đã hủy rao bán');load()}catch(e){toast(e.message,1)}}
-function qr(id){
- openModal('<h2>Mã QR vào cổng</h2><div class=qrbox id=qb>Đang tạo mã...</div><p class="note" id=cd style="text-align:center"></p><div class=row><input id=qt readonly class=mono style="flex:1"><button class="btn sm ghost" id=cp>Copy mã</button></div><p class=note>Mã tự đổi mỗi 20 giây. Ảnh chụp màn hình sẽ hết hạn.</p><div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button></div>');
- $('#cp').onclick=()=>{navigator.clipboard?.writeText($('#qt').value);toast('Đã copy mã QR!')};
- const g=async()=>{try{const r=await api('qr/'+id);$('#qb').innerHTML=r.svg;$('#qt').value=r.token;let s=r.left;clearInterval(window.tm);window.tm=setInterval(()=>{if(!$('#cd'))return clearInterval(window.tm);$('#cd').textContent='Đổi mã sau '+s+' giây';if(--s<0)g()},1000)}catch(e){toast(e.message,1)}};g();
-}
 async function viewChain(id){
  try{
   const d=await api('tickets/'+id+'/chain');const oc=d.onChain;

@@ -147,10 +147,23 @@ function draw(){
    <input id=tk placeholder="AVATIX|ticketId|owner|window|signature" style="font-family:ui-monospace,monospace;font-size:13px">
    <div class=row style="margin-top:14px"><button class=btn id=sc style="width:100%;padding:12px">🔍 Kiểm tra &amp; Check-in vé</button></div>
    <div id=res class=note style="margin-top:14px"></div>
+
+   <div id=testQrBox style="margin-top:24px;padding:16px;background:rgba(0,177,79,0.04);border:1px dashed var(--tb-green);border-radius:12px">
+     <div style="font-size:13px;font-weight:800;color:var(--tb-green);margin-bottom:6px;display:flex;align-items:center;gap:6px">
+       <span>⚡</span> CÔNG CỤ TẠO MÃ QR TEST CHECK-IN (DÀNH CHO BAN TỔ CHỨC)
+     </div>
+     <p class="note" style="margin:0 0 10px;font-size:12.5px">
+       Hệ thống tự động lấy các vé chưa check-in của show do bạn tổ chức để tạo mã QR test hoặc tự động điền mã vào ô kiểm tra bên trên:
+     </p>
+     <div id=sampleTicketsList style="display:flex;flex-direction:column;gap:8px">
+       <div style="font-size:12.5px;color:var(--text-muted)">⏳ Đang tải danh sách vé...</div>
+     </div>
+   </div>
   </div>`;
   $('#sc').onclick=()=>scan();
   $('#btnCamStart').onclick=startCamera;
   $('#btnCamStop').onclick=stopCamera;
+  loadSampleTickets();
  }else{
   b.innerHTML=renderHistory(hs);
  }
@@ -494,6 +507,43 @@ async function scan(tokenParam){
   toast(x.message, 1);
  }finally{
   if($('#sc')){ $('#sc').disabled = false; $('#sc').textContent = '🔍 Kiểm tra & Check-in vé'; }
+ }
+}
+
+async function loadSampleTickets(){
+ const box = $('#sampleTicketsList');
+ if(!box) return;
+ try{
+  const list = await api('scan/sample-tickets');
+  if(!list.length){
+   box.innerHTML = '<div style="font-size:12.5px;color:var(--text-muted);font-style:italic">Chưa có vé nào khả dụng để test (hãy tạo show và dùng tài khoản Khách hàng mua vé trước).</div>';
+   return;
+  }
+  box.innerHTML = list.map(t => `
+   <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;padding:10px 12px;border-radius:8px;border:1px solid var(--border);gap:8px;flex-wrap:wrap">
+     <div style="font-size:13px">
+       <b>Vé #${t.id}</b> · ${esc(t.event_name)} <span class="note" style="margin:0;color:var(--tb-green);font-weight:600">(${esc(t.owner_name)})</span>
+     </div>
+     <div style="display:flex;gap:6px">
+       <button type="button" class="btn sm" onclick="fillTestTicket(${t.id})">⚡ Điền mã test</button>
+       <button type="button" class="btn sm ghost" onclick="qr(${t.id})">👁️ Mở mã QR</button>
+     </div>
+   </div>
+  `).join('');
+ }catch(e){
+  box.innerHTML = `<div class="note err">${esc(e.message)}</div>`;
+ }
+}
+
+async function fillTestTicket(id){
+ try{
+  toast('Đang tạo mã QR động thời gian thực...');
+  const r = await api('qr/' + id);
+  if($('#tk')) $('#tk').value = r.token;
+  toast('Đã điền mã QR vé #' + id + ' vào ô kiểm tra!');
+  $('#tk')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+ }catch(e){
+  toast(e.message, 1);
  }
 }
 </script>
