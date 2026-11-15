@@ -39,7 +39,8 @@ function showChainInfo(){
 function renderHistory(rows){
   const labels={topup:'💰 Nạp tiền',buy:'🎟️ Mua vé',sale:'💵 Bán vé',list:'🔄 Đăng bán lại',scan:'📷 Soát vé',refund:'↩️ Hoàn tiền',verify_email:'✉️ Xác thực Email',security:'🔐 Bảo mật / Đổi MK'};
   if(!rows.length)return '<div class="card empty">Chưa có giao dịch nào trong lịch sử.</div>';
-  return `<div class="card tbl-wrap"><table class=hist>
+  
+  const desktopTable = `<div class="card tbl-wrap hist-desktop"><table class=hist>
     <thead><tr><th>Thời gian</th><th>Loại giao dịch</th><th>Số tiền</th><th>Chi tiết</th><th>Minh chứng On-chain</th></tr></thead>
     <tbody>${rows.map(tx=>`<tr>
       <td>${esc(tx.at)}</td>
@@ -49,30 +50,59 @@ function renderHistory(rows){
       <td>${txHtml(tx.tx_hash,tx.explorerUrl)}</td>
     </tr>`).join('')}</tbody>
   </table></div>`;
+
+  const mobileCards = `<div class="hist-mobile">${rows.map(tx=>{
+    const isPlus = tx.amount > 0;
+    const isMinus = tx.amount < 0;
+    const amtColor = isPlus ? '#059669' : isMinus ? '#dc2626' : 'var(--text-muted)';
+    const amtText = isPlus ? '+'+vnd(tx.amount) : isMinus ? '-'+vnd(Math.abs(tx.amount)) : '—';
+    return `<div class="hist-card">
+      <div class="hist-card-head">
+        <span class="badge" style="font-size:12px">${esc(labels[tx.type]||tx.type)}</span>
+        <span class="hist-card-amt" style="color:${amtColor};font-weight:800;font-size:15px">${amtText}</span>
+      </div>
+      <div class="hist-card-body">${esc(tx.note)}</div>
+      <div class="hist-card-foot">
+        <span class="hist-card-time">🕒 ${esc(tx.at)}</span>
+        <div class="hist-card-tx">${txHtml(tx.tx_hash,tx.explorerUrl)}</div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+
+  return desktopTable + mobileCards;
 }
 function renderTop(me,role){
   const c=me.chain||{};
   const pill=c.enabled?`⛓️ ${esc(c.networkName)}`:'⛓️ Off-chain';
   const secBtn=me.emailVerified
-    ?`<button class="chain-pill on" onclick=openSecurityModal() title="Email đã xác thực · Đổi mật khẩu">🛡️ Bảo mật</button>`
-    :`<button class="chain-pill warn" onclick=openSecurityModal() title="Xác thực email & Đổi mật khẩu">⚠️ Xác thực Email</button>`;
+    ?`<button class="chain-pill on top-sec-btn" onclick=openSecurityModal() title="Email đã xác thực · Đổi mật khẩu"><span class=sec-icon>🛡️</span><span class=sec-text> Bảo mật</span></button>`
+    :`<button class="chain-pill warn top-sec-btn" onclick=openSecurityModal() title="Xác thực email & Đổi mật khẩu"><span class=sec-icon>⚠️</span><span class=sec-text> Xác thực</span></button>`;
   const firstLetter = (me.username || 'U')[0].toUpperCase();
+  const roleBadge = role === 'organizer' ? 'ORGANIZER' : 'WEB3';
+  const roleLabel = role === 'customer' ? 'Khách' : 'BTC';
+
   $('#top').innerHTML=`
-    <div class=top-left>
-      <div class=logo onclick="location.reload()">
-        <span>AVA</span>-TIX <small>WEB3</small>
+    <div class="top-row-1">
+      <div class="top-brand">
+        <div class="logo" onclick="location.reload()">
+          <span>AVA</span>-TIX <small>${roleBadge}</small>
+        </div>
+        <button class="chain-pill ${c.enabled?'on':'off'}" onclick="showChainInfo()" title="Xem thông tin Smart Contract Avalanche">${pill}</button>
       </div>
-      <button class="chain-pill ${c.enabled?'on':'off'}" onclick=showChainInfo() title="Xem thông tin Smart Contract Avalanche">${pill}</button>
+      <div class="top-quick-actions">
+        ${secBtn}
+        <button class="btn ghost sm btn-logout" onclick="logout()" title="Đăng xuất">Đăng xuất</button>
+      </div>
     </div>
-    <div class=top-right>
-      ${secBtn}
-      <div class=top-user title="Tài khoản ${role==='customer'?'Khách hàng':'Nhà tổ chức'}">
-        <span class=avatar>${firstLetter}</span>
-        <span><b>${esc(me.username)}</b> <small style="color:#64748b">(${role==='customer'?'Khách':'BTC'})</small></span>
+    <div class="top-row-2">
+      <div class="top-user" title="Tài khoản ${role==='customer'?'Khách hàng':'Nhà tổ chức'}">
+        <span class="avatar">${firstLetter}</span>
+        <span class="top-user-name"><b>${esc(me.username)}</b> <small style="color:#64748b">(${roleLabel})</small></span>
       </div>
-      <div class=bal><span>💰</span> Ví: <span id=bal></span></div>
-      <button class="btn green sm" onclick=topup()>+ Nạp tiền</button>
-      <button class="btn ghost sm" onclick=logout() title="Đăng xuất">Đăng xuất</button>
+      <div class="top-wallet">
+        <div class="bal" onclick="topup()" title="Bấm để nạp tiền"><span>💰</span> <span class="bal-label">Ví: </span><span id="bal"></span></div>
+        <button class="btn green sm btn-topup" onclick="topup()">+ <span class="topup-text">Nạp tiền</span></button>
+      </div>
     </div>`;
   setBal(me);
 }
