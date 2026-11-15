@@ -106,13 +106,18 @@ function draw(){
     <span style="position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,0.7);color:#fff;padding:2px 8px;border-radius:4px;font-size:11px">Xem trước ảnh đại diện</span>
    </div>
    <label style="margin-top:12px">Giới hạn số vé mỗi tài khoản (Chống gom vé / Bot)</label>
-   <select id=maxPerUser style="padding:10px;border-radius:10px;border:1px solid var(--border);width:100%;font-size:14px;background:#fff;margin-bottom:12px">
-     <option value="0">🌐 Không giới hạn (Vô hạn vé - Hội thảo/Sự kiện mở)</option>
-     <option value="1">🔒 Tối đa 1 vé / tài khoản (Show hot / Chống phe vé tối đa)</option>
-     <option value="2" selected>👥 Tối đa 2 vé / tài khoản (Khuyên dùng - Đi theo cặp)</option>
-     <option value="4">👨‍👩‍👧‍👦 Tối đa 4 vé / tài khoản (Đi theo nhóm bạn)</option>
-     <option value="6">🎟️ Tối đa 6 vé / tài khoản</option>
+   <select id=maxPerUser onchange="toggleCustomMax(this.value)" style="padding:10px;border-radius:10px;border:1px solid var(--border);width:100%;font-size:14px;background:#fff;margin-bottom:8px">
+     <option value="0">Không giới hạn (Vô hạn vé - Hội thảo / Sự kiện mở)</option>
+     <option value="1">Tối đa 1 vé / tài khoản (Show hot / Chống phe vé tối đa)</option>
+     <option value="2" selected>Tối đa 2 vé / tài khoản (Khuyên dùng - Đi theo cặp)</option>
+     <option value="4">Tối đa 4 vé / tài khoản (Đi theo nhóm bạn)</option>
+     <option value="6">Tối đa 6 vé / tài khoản (Đi theo gia đình)</option>
+     <option value="custom">Tùy chỉnh số lượng khác...</option>
    </select>
+   <div id=customMaxBox style="display:none;margin-bottom:12px">
+     <label style="font-size:13px;color:var(--text-muted)">Nhập số vé tối đa cho mỗi tài khoản:</label>
+     <input id=customMaxInput type=number min=1 max=1000 placeholder="Ví dụ: 3, 5, 8, 10..." style="padding:10px;border-radius:10px;border:1px solid var(--border);width:100%;font-size:14px">
+   </div>
    <label>Thông tin chi tiết sự kiện</label>
    <textarea id=desc rows=4 placeholder="Mô tả sự kiện, nghệ sĩ tham gia biểu diễn, lịch trình mở cổng, quy định check-in và quyền lợi vé..."></textarea>
    <p class=note>💡 Hệ thống tự động ghi nhận vé lên Smart Contract. Khi số vé về 0, hệ thống tự động khóa mua và hiển thị SOLD OUT. Phí sàn 5% trên mỗi vé bán ra.</p>
@@ -365,16 +370,33 @@ async function saveCover(id){
  }catch(x){toast(x.message,1)}
 }
 
+function toggleCustomMax(v){
+ const b=$('#customMaxBox');if(!b)return;
+ const isC=v==='custom';
+ b.style.display=isC?'block':'none';
+ if(isC)$('#customMaxInput')?.focus();
+}
+
 async function create(e){
  e.preventDefault();
  try{
+  let maxPerUser = 0;
+  if ($('#maxPerUser')) {
+   if ($('#maxPerUser').value === 'custom') {
+    const cVal = parseInt($('#customMaxInput')?.value, 10);
+    if (!cVal || cVal < 1) throw new Error('Vui lòng nhập số vé tối đa hợp lệ (tối thiểu 1 vé)');
+    maxPerUser = cVal;
+   } else {
+    maxPerUser = parseInt($('#maxPerUser').value, 10) || 0;
+   }
+  }
   await api('events',{
    name:$('#n').value.trim(),
    date:$('#d').value,
    venue:$('#v').value.trim(),
    price:num($('#p').value),
    total:Number($('#t').value),
-   max_per_user:Number($('#maxPerUser')?$('#maxPerUser').value:0)||0,
+   max_per_user:maxPerUser,
    description:$('#desc').value.trim(),
    image:$('#img')?$('#img').value.trim():''
   });
