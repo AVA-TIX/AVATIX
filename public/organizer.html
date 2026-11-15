@@ -9,10 +9,10 @@
     <div class=footer-col>
       <h4>Công cụ quản trị</h4>
       <ul class=footer-links>
-        <li><a href="#" onclick="tab='stats';draw();return false">📊 Thống kê doanh thu &amp; Phân phối</a></li>
-        <li><a href="#" onclick="tab='create';draw();return false">➕ Đăng ký &amp; Phát hành show mới</a></li>
-        <li><a href="#" onclick="tab='scan';draw();return false">📷 Đầu đọc soát vé vào cổng</a></li>
-        <li><a href="#" onclick="tab='history';draw();return false">⛓️ Lịch sử Smart Contract</a></li>
+        <li><a href="#" onclick="tab='stats';draw();return false">Thống kê doanh thu &amp; Phân phối</a></li>
+        <li><a href="#" onclick="tab='create';draw();return false">Đăng ký &amp; Phát hành show mới</a></li>
+        <li><a href="#" onclick="tab='scan';draw();return false">Soát vé vào cổng</a></li>
+        <li><a href="#" onclick="tab='history';draw();return false">Lịch sử Smart Contract</a></li>
       </ul>
     </div>
     <div class=footer-col>
@@ -28,7 +28,7 @@
 </footer>
 <script src=app.js></script><script>
 let tab='stats',st=[],hs=[];
-const T={stats:'📊 Thống kê show diễn',create:'➕ Tạo sự kiện mới',scan:'📷 Soát vé tại cổng',history:'⛓️ Lịch sử On-chain'};
+const T={stats:'Thống kê show diễn',create:'Tạo sự kiện mới',scan:'Soát vé tại cổng',history:'Lịch sử On-chain'};
 (async()=>{window.me=await init('organizer');if(me)load()})();
 async function load(){[st,hs]=await Promise.all([api('stats'),api('history')]);draw()}
 
@@ -59,17 +59,17 @@ function draw(){
 
   b.innerHTML=`<div class=tiles>
    <div class=card>
-     <span class=tile-label>🎪 Tổng số show diễn</span>
+     <span class=tile-label>Tổng số show diễn</span>
      <b>${st.length}</b>
      ${cancelledShows.length > 0 ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px">${activeShows.length} đang mở · ${cancelledShows.length} đã hủy</div>` : ''}
    </div>
    <div class=card>
-     <span class=tile-label>🎟️ Vé đã phân phối</span>
+     <span class=tile-label>Vé đã phân phối</span>
      <b style="color:var(--tb-green)">${totalActiveSold}/${totalActiveCap || 0}</b>
      ${cancelledShows.length > 0 ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px">${totalRefunded > 0 ? `Đã hoàn lại ${totalRefunded} vé (show hủy)` : 'Đã loại trừ các show đã hủy'}</div>` : ''}
    </div>
    <div class=card>
-     <span class=tile-label>💰 Doanh thu thực nhận (95%)</span>
+     <span class=tile-label>Doanh thu thực nhận (95%)</span>
      <b style="color:var(--tb-green)">${vnd(totalActiveRev)}</b>
      ${cancelledShows.length > 0 ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px">Đã khấu trừ hoàn tiền các show hủy</div>` : ''}
    </div>
@@ -90,7 +90,7 @@ function draw(){
    <label>Ảnh đại diện / Poster sự kiện</label>
    <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
     <label class="btn sm" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin:0;padding:8px 14px">
-     📁 Tải ảnh từ máy tính / điện thoại
+     📁 Tải ảnh lên
      <input type="file" id="filePick" accept="image/*" style="display:none" onchange="processFile(this.files[0],'#img',previewCreateCover)">
     </label>
     <span class=note style="margin:0">hoặc dán link URL bên dưới</span>
@@ -105,11 +105,11 @@ function draw(){
    <div id=createPreviewBox style="display:none;margin-top:10px;border-radius:12px;height:150px;background-size:cover;background-position:center;border:1px solid var(--border);position:relative">
     <span style="position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,0.7);color:#fff;padding:2px 8px;border-radius:4px;font-size:11px">Xem trước ảnh đại diện</span>
    </div>
-   <label style="margin-top:12px">Giới hạn số vé mỗi tài khoản (Chống gom vé / Bot)</label>
+   <label style="margin-top:12px">Giới hạn số vé mỗi tài khoản</label>
    <select id=maxPerUser onchange="toggleCustomMax(this.value)" style="padding:10px;border-radius:10px;border:1px solid var(--border);width:100%;font-size:14px;background:#fff;margin-bottom:8px">
-     <option value="0">Không giới hạn (Vô hạn vé - Hội thảo / Sự kiện mở)</option>
-     <option value="1">Tối đa 1 vé / tài khoản (Show hot / Chống phe vé tối đa)</option>
-     <option value="2" selected>Tối đa 2 vé / tài khoản (Khuyên dùng - Đi theo cặp)</option>
+     <option value="0">Không giới hạn (Hội thảo / Sự kiện mở)</option>
+     <option value="1">Tối đa 1 vé / tài khoản (Show hot)</option>
+     <option value="2" selected>Tối đa 2 vé / tài khoản (Đi theo cặp)</option>
      <option value="4">Tối đa 4 vé / tài khoản (Đi theo nhóm bạn)</option>
      <option value="6">Tối đa 6 vé / tài khoản (Đi theo gia đình)</option>
      <option value="custom">Tùy chỉnh số lượng khác...</option>
@@ -120,19 +120,19 @@ function draw(){
    </div>
    <label>Thông tin chi tiết sự kiện</label>
    <textarea id=desc rows=4 placeholder="Mô tả sự kiện, nghệ sĩ tham gia biểu diễn, lịch trình mở cổng, quy định check-in và quyền lợi vé..."></textarea>
-   <p class=note>💡 Hệ thống tự động ghi nhận vé lên Smart Contract. Khi số vé về 0, hệ thống tự động khóa mua và hiển thị SOLD OUT. Phí sàn 5% trên mỗi vé bán ra.</p>
-   <button class=btn style="width:100%;margin-top:14px;padding:12px">🚀 Đăng sự kiện lên AVA-TIX</button>
+   <p class=note>💡 Hệ thống tự động ghi nhận vé lên Smart Contract. Phí sàn 5% trên mỗi vé bán ra.</p>
+   <button class=btn style="width:100%;margin-top:14px;padding:12px">Đăng sự kiện lên AVA-TIX</button>
   </form>`;
   $('#f').onsubmit=create;
  }else if(tab==='scan'){
   b.innerHTML=`<div class=card style="max-width:560px;margin:10px auto;padding:26px">
-   <h2>📷 Soát vé On-chain tại cổng</h2>
-   <p class=note>Hệ thống tự động giải mã chữ ký mật mã học của QR xoay 20s và ghi nhận trạng thái vé đã sử dụng lên Smart Contract.</p>
+   <h2>Soát vé On-chain tại cổng</h2>
+   <!-- <p class=note>Hệ thống tự động giải mã chữ ký mật mã học của QR xoay 20s và ghi nhận trạng thái vé đã sử dụng lên Smart Contract.</p> -->
    
    <div style="margin:16px 0;padding:16px;background:rgba(0,177,79,0.06);border:1px solid rgba(0,177,79,0.3);border-radius:12px">
      <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
-       <button class="btn green" id=btnCamStart style="flex:1;padding:12px;font-size:14px;font-weight:700">📷 Bật Camera quét mã QR</button>
-       <button class="btn ghost red" id=btnCamStop style="display:none;padding:12px;font-size:14px">⏹️ Tắt Camera</button>
+       <button class="btn green" id=btnCamStart style="flex:1;padding:12px;font-size:14px;font-weight:700">Bật Camera quét mã QR</button>
+       <button class="btn ghost red" id=btnCamStop style="display:none;padding:12px;font-size:14px">Tắt Camera</button>
      </div>
      <div id=camReader style="display:none;margin-top:12px;border-radius:12px;overflow:hidden;border:2px solid var(--tb-green);background:#000"></div>
      <div id=camStatus class=note style="font-size:12px;text-align:center;margin-top:6px">💡 Hướng camera vào màn hình mã QR động của khán giả</div>
@@ -205,9 +205,9 @@ function list(){
     </div>
     <div class=card-action-bar style="margin-top:12px;gap:6px;flex-wrap:wrap">
      ${isCancelled
-       ? `<button class="btn sm ghost" style="width:100%" onclick="viewOrgDetail(${e.id})">👁️ Xem chi tiết show đã hủy</button>`
+       ? `<button class="btn sm ghost" style="width:100%" onclick="viewOrgDetail(${e.id})">Xem chi tiết show đã hủy</button>`
        : `<button class="btn sm ghost" style="flex:1" onclick="viewOrgDetail(${e.id})">👁️ Chi tiết</button>
-          <button class="btn sm ghost" onclick="changeCoverModal(${e.id})" title="Đổi ảnh đại diện">🖼️ Đổi ảnh</button>
+          <button class="btn sm ghost" onclick="changeCoverModal(${e.id})" title="Đổi ảnh đại diện">Đổi ảnh</button>
           <button class="btn sm ghost red" onclick="confirmCancelShow(${e.id})" title="Hủy show và tự động hoàn tiền vào ví người mua">🚫 Hủy show</button>`
      }
     </div>
@@ -222,7 +222,7 @@ function viewOrgDetail(id){
  const isCancelled = e.status === 'cancelled';
  openModal(`
   <div class="modal-banner" style="background-image:linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.8) 100%), url('${esc(imgUrl)}')">
-   <div class=modal-banner-tag>🎪 Show của bạn · ID #${e.id}</div>
+   <div class=modal-banner-tag>Show của bạn · ID #${e.id}</div>
   </div>
   <h2>${esc(e.name)} ${isCancelled?'<span class="badge out">❌ Đã hủy show</span>':''}</h2>
   <table class=info>
@@ -243,7 +243,7 @@ function viewOrgDetail(id){
   </div>
   <div class=row style="gap:8px">
    <button class="btn ghost" onclick=closeModal()>Đóng</button>
-   ${isCancelled?'':`<button class="btn sm" onclick="changeCoverModal(${e.id})">🖼️ Đổi ảnh</button>
+   ${isCancelled?'':`<button class="btn sm" onclick="changeCoverModal(${e.id})">Đổi ảnh</button>
    <button class="btn sm red" onclick="confirmCancelShow(${e.id})">🚫 Hủy show &amp; Hoàn tiền</button>`}
   </div>`);
 }
@@ -297,7 +297,7 @@ function setCreatePreset(u){
 function changeCoverModal(id){
  const e=st.find(x=>x.id===id);if(!e)return;
  const curImg=e.image||'';
- openModal(`<h2>🖼️ Đổi ảnh đại diện show diễn</h2>
+ openModal(`<h2>Đổi ảnh đại diện show diễn</h2>
   <p class=note>Sự kiện: <b>${esc(e.name)}</b></p>
   <label>Ảnh đại diện / Poster</label>
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
