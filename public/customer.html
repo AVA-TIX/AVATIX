@@ -35,14 +35,14 @@ async function load(){[ev,tk,mk,hs]=await Promise.all([api('events'),api('ticket
 const hit=o=>(o.name+' '+o.venue).toLowerCase().includes($('#q').value.trim().toLowerCase());
 
 function renderHero(list){
- if(tab!=='open'||!list.length)return'';
- const topEv=list[0],imgUrl=getEventImg(topEv),th=bannerTheme(topEv.name);
- const isCancelled=topEv.status==='cancelled';
+ const activeList=list.filter(e=>e.status!=='cancelled');
+ if(tab!=='open'||!activeList.length)return'';
+ const topEv=activeList[0],imgUrl=getEventImg(topEv),th=bannerTheme(topEv.name);
  const myTicketCount=tk.filter(t=>t.event===topEv.id&&t.used!=2).length;
  const isLimitReached=topEv.max_per_user>0&&myTicketCount>=topEv.max_per_user;
  return `<div class="hero-banner" style="background-image:linear-gradient(90deg, rgba(15,23,42,0.92) 0%, rgba(15,23,42,0.8) 55%, rgba(15,23,42,0.35) 100%), url('${esc(imgUrl)}')">
   <div class="hero-content">
-   <div class="hero-tag">${isCancelled?'❌ SỰ KIỆN ĐÃ HỦY':'🔥 ĐẠI NHẠC HỘI TIÊU ĐIỂM · '+th.tag}</div>
+   <div class="hero-tag">🔥 ĐẠI NHẠC HỘI TIÊU ĐIỂM · ${th.tag}</div>
    <h2 class="hero-title">${esc(topEv.name)}</h2>
    <p class="hero-desc">${topEv.max_per_user>0?` (Quy định: Tối đa ${topEv.max_per_user} vé/tài khoản)`:''}</p>
    <div class="hero-meta">
@@ -52,8 +52,7 @@ function renderHero(list){
     ${topEv.max_per_user>0?`<div class="hero-meta-item">🔒 <b>Tối đa ${topEv.max_per_user} vé/TK</b></div>`:''}
    </div>
    <div class="hero-actions">
-    ${isCancelled?`<button class="btn" disabled style="background:#475569;border-color:#475569;cursor:not-allowed">❌ Show đã hủy</button>`:
-      isLimitReached?`<button class="btn" disabled style="background:#475569;border-color:#475569;cursor:not-allowed" title="Bạn đã mua tối đa ${topEv.max_per_user} vé">Đã đạt giới hạn (${topEv.max_per_user} vé)</button>`:
+    ${isLimitReached?`<button class="btn" disabled style="background:#475569;border-color:#475569;cursor:not-allowed" title="Bạn đã mua tối đa ${topEv.max_per_user} vé">Đã đạt giới hạn (${topEv.max_per_user} vé)</button>`:
       `<button class="btn" ${topEv.remain>0?'':'disabled'} onclick="confirmBuy('buy',{event:${topEv.id}},${topEv.id},'open')">
        ${topEv.remain>0?'🛒 Mua vé ngay':'Hết vé'}
       </button>`}
@@ -67,14 +66,14 @@ function renderHero(list){
 }
 
 function draw(){
- $('#heroWrap').innerHTML=renderHero(ev);
+ const activeEv=ev.filter(e=>e.status!=='cancelled');
+ $('#heroWrap').innerHTML=renderHero(activeEv);
  $('#tabs').innerHTML=Object.entries(T).map(([k,v])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';draw()">${v}</button>`).join('');
  $('#q').parentElement.hidden=tab==='history';
  if(tab==='history'){$('#wrapList').innerHTML=renderHistory(hs);return}
 
- const L=tab==='open'?ev.filter(hit).map(e=>{
+ const L=tab==='open'?activeEv.filter(hit).map(e=>{
   const th=bannerTheme(e.name),db=parseDateBadge(e.date),imgUrl=getEventImg(e);
-  const isCancelled=e.status==='cancelled';
   const myTicketCount=tk.filter(t=>t.event===e.id&&t.used!=2).length;
   const isLimitReached=e.max_per_user>0&&myTicketCount>=e.max_per_user;
   const limitLabel=e.max_per_user>0?`<div class=event-details-row><span>🔒 Giới hạn: <b>Tối đa ${e.max_per_user} vé/TK</b> ${myTicketCount>0?`(đã mua ${myTicketCount})`:''}</span></div>`:'';
@@ -85,7 +84,7 @@ function draw(){
      <div class=month>${db.m}</div>
      <div class=day>${db.d}</div>
     </div>
-    <span class="poster-tag ${isCancelled||e.remain<=0?'out':''}">${isCancelled?'❌ ĐÃ HỦY SHOW':e.remain>0?'⚡ ĐANG MỞ BÁN':'SOLD OUT'}</span>
+    <span class="poster-tag ${e.remain<=0?'out':''}">${e.remain>0?'⚡ ĐANG MỞ BÁN':'SOLD OUT'}</span>
     <span class=event-poster-genre>${th.icon} ${th.tag}</span>
    </div>
    <div class=card-content>
@@ -95,7 +94,6 @@ function draw(){
      <div class=event-details-row>📍 <span>${esc(e.venue)}</span></div>
      <div class=event-details-row>🏢 <span>${esc(e.org)}</span></div>
      ${limitLabel}
-     ${isCancelled?'<div class=event-details-row><span style="color:#ef4444;font-weight:700">⚠️ Ban tổ chức đã hủy sự kiện này</span></div>':''}
     </div>
     <div class=card-action-bar>
      <div class=price-block>
@@ -104,8 +102,7 @@ function draw(){
      </div>
      <div class=card-btn-group>
       <button class="btn sm ghost" onclick="viewDetail(${e.id},'open')">👁️ Chi tiết</button>
-      ${isCancelled?`<button class="btn sm" disabled style="background:#475569;border-color:#475569;cursor:not-allowed">Đã hủy show</button>`:
-        isLimitReached?`<button class="btn sm" disabled style="background:#475569;border-color:#475569;cursor:not-allowed" title="Bạn đã mua đủ số lượng vé tối đa">Đã đạt giới hạn (${e.max_per_user} vé)</button>`:
+      ${isLimitReached?`<button class="btn sm" disabled style="background:#475569;border-color:#475569;cursor:not-allowed" title="Bạn đã mua đủ số lượng vé tối đa">Đã đạt giới hạn (${e.max_per_user} vé)</button>`:
         `<button class="btn sm" ${e.remain>0?'':'disabled'} onclick="confirmBuy('buy',{event:${e.id}},${e.id},'open')">
          ${e.remain>0?'🛒 Mua vé':'Hết vé'}
         </button>`}

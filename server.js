@@ -313,7 +313,7 @@ route('post', 'topup', true, async r => {
 });
 
 // ─── Events ───────────────────────────────────────────────────────────────────
-const evSql = 'SELECT e.*,u.username org FROM events e JOIN users u ON u.id=e.org';
+const evSql = "SELECT e.*,u.username org FROM events e JOIN users u ON u.id=e.org WHERE (e.status != 'cancelled' OR e.status IS NULL)";
 route('get', 'events', true, () => db.all(evSql + ' ORDER BY e.date'));
 route('post', 'events', 'organizer', async r => {
   const b = r.body, name = String(b.name || '').trim(), venue = String(b.venue || '').trim();
