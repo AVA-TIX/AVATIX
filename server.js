@@ -528,34 +528,14 @@ const STEP = 20;
 const W = () => Math.floor(Date.now() / (STEP * 1000)),
   tok = (t, w) => `AVATIX|${t.id}|${t.owner}|${w}|${sign(`${t.id}|${t.owner}|${w}`)}`;
 
-route('get', 'qr/:id', true, async r => {
-  let t;
-  if (r.u.role === 'customer') {
-    t = await db.get('SELECT * FROM tickets WHERE id=? AND owner=?', [+r.params.id, r.u.id]);
-    if (!t) throw E('Bạn không sở hữu vé này');
-  } else if (r.u.role === 'organizer') {
-    t = await db.get('SELECT t.* FROM tickets t JOIN events e ON e.id=t.event WHERE t.id=? AND e.org=?', [+r.params.id, r.u.id]);
-    if (!t) throw E('Vé không thuộc sự kiện do bạn tổ chức');
-  } else {
-    throw E('Không có quyền truy cập', 403);
-  }
+route('get', 'qr/:id', 'customer', async r => {
+  const t = await db.get('SELECT * FROM tickets WHERE id=? AND owner=?', [+r.params.id, r.u.id]);
+  if (!t) throw E('Bạn không sở hữu vé này');
   if (t.used === 2) throw E('Sự kiện đã bị hủy và tiền vé đã được hoàn trả');
   if (t.used === 1) throw E('Vé đã được sử dụng trước đó (đã check-in)');
   const token = tok(t, W());
   const svg = await QR.toString(token, { type: 'svg', errorCorrectionLevel: 'H', margin: 2, width: 360 });
   return { svg, token, left: STEP - Math.floor((Date.now() / 1000) % STEP) };
-});
-
-route('get', 'scan/sample-tickets', 'organizer', async r => {
-  const rows = await db.all(`
-    SELECT t.id, t.event, t.owner, t.token_id, e.name as event_name, u.username as owner_name
-    FROM tickets t
-    JOIN events e ON e.id = t.event
-    JOIN users u ON u.id = t.owner
-    WHERE e.org = ? AND t.used = 0 AND e.status != 'cancelled'
-    ORDER BY t.id DESC LIMIT 10
-  `, [r.u.id]);
-  return rows;
 });
 
 // ─── Scan (Check-in) ──────────────────────────────────────────────────────────
