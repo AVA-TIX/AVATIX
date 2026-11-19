@@ -16,6 +16,51 @@ async function api(u,b){
 function toast(t,bad){const e=document.createElement('div');e.id='toast';e.className=bad?'bad':'';e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),3600)}
 function openModal(h){$('#m').innerHTML='<div class="mb">'+h+'</div>';$('#m').hidden=false}
 function closeModal(){$('#m').hidden=true;$('#m').innerHTML='';clearInterval(window.tm)}
+function openTermsModal(){
+  let tm = $('#termsModal');
+  if(!tm){
+    document.body.insertAdjacentHTML('beforeend', `<div id=termsModal hidden role=dialog aria-modal=true aria-label="Điều khoản và Chính sách AVA-TIX">
+      <div class=terms-box>
+        <div class=terms-head>
+          <h2>Điều khoản &amp; Chính sách AVA-TIX</h2>
+          <button type=button class=modal-x onclick=closeTermsModal() aria-label="Đóng" title="Đóng">✕</button>
+        </div>
+        <div class=terms-body>
+          <h3>1. Mua vé &amp; Thanh toán</h3>
+          <p>Mỗi lượt mua tương ứng 1 vé, thanh toán trừ trực tiếp từ số dư ví khả dụng và yêu cầu xác thực OTP Email. Khi sự kiện hết vé (SOLD OUT), tính năng mua vé sơ cấp sẽ tự động khóa.</p>
+          <h3>2. Phí nền tảng</h3>
+          <p>AVA-TIX thu phí sàn 5% trên mỗi giao dịch (bán sơ cấp và bán lại trên chợ thứ cấp). Không thu thêm phí bản quyền ẩn.</p>
+          <h3>3. Quy định chống phe vé &amp; chống gom vé</h3>
+          <p>Giá bán lại trên chợ thứ cấp không được vượt quá <b>giá gốc + 10%</b>. Hệ thống và Smart Contract từ chối mọi giao dịch niêm yết vượt trần hoặc vượt quá giới hạn vé/tài khoản do Ban tổ chức quy định.</p>
+          <h3>4. Mã QR động vào cổng</h3>
+          <p>Mã QR tự động đổi mỗi 20 giây và gắn với chủ sở hữu hiện tại. Ảnh chụp màn hình hoặc vé đã sang nhượng đều không còn hiệu lực. Vé đã check-in không thể bán lại.</p>
+          <h3>5. Hủy sự kiện &amp; Hoàn tiền 100%</h3>
+          <p>Trường hợp Ban tổ chức hủy show, hệ thống tự động hoàn trả <b>100% tiền vé</b> về ví của khán giả đang sở hữu vé và vô hiệu hóa vé tương ứng.</p>
+          <h3>6. Trách nhiệm Nhà cung cấp (BTC)</h3>
+          <p>Nhà cung cấp phải cung cấp CCCD 12 số hợp lệ để xác minh danh tính và chịu hoàn toàn trách nhiệm về tính chính xác của thông tin sự kiện đã đăng.</p>
+          <h3>7. Bảo mật &amp; Dữ liệu cá nhân</h3>
+          <p>Thông tin tài khoản chỉ phục vụ vận hành dịch vụ, xác thực OTP và bảo vệ phiên đăng nhập kép (tối đa 1 PC + 1 Điện thoại cùng lúc).</p>
+        </div>
+        <div class=terms-foot>
+          <button type=button class="btn sm" onclick=closeTermsModal()>Đóng</button>
+        </div>
+      </div>
+    </div>`);
+    tm = $('#termsModal');
+    tm.onclick = e => { if(e.target === tm) closeTermsModal(); };
+  }
+  tm.hidden = false;
+}
+function closeTermsModal(){
+  const tm = $('#termsModal');
+  if(tm) tm.hidden = true;
+}
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape'){
+    const tm = $('#termsModal');
+    if(tm && !tm.hidden) closeTermsModal();
+  }
+});
 function txHtml(txHash,url){
   if(!txHash)return '<span class=note>Off-chain</span>';
   const s=esc(shortHash(txHash));

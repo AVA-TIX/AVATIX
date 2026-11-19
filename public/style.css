@@ -1468,3 +1468,116 @@ body.auth {
     display: none; /* Just show '+' on tiny screens */
   }
 }
+
+/* ─── Terms & Policy Popup Modal (layered above #m) ──────────────────────── */
+#termsModal {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.18s ease-out;
+}
+#termsModal[hidden] { display: none; }
+
+.terms-box {
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  width: min(600px, 100%);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  animation: modalScale 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.terms-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.terms-head h2 {
+  margin: 0;
+  font-size: 19px;
+  color: var(--dark-heading);
+}
+
+.modal-x {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: var(--trans);
+}
+.modal-x:hover {
+  background: var(--tb-red-light);
+  color: var(--tb-red);
+  border-color: rgba(255, 56, 92, 0.35);
+}
+
+.terms-body {
+  padding: 18px 22px;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.terms-body h3 {
+  font-size: 15px;
+  color: var(--dark-heading);
+  margin: 14px 0 6px;
+}
+.terms-body h3:first-child {
+  margin-top: 0;
+}
+.terms-body p {
+  margin: 0 0 8px;
+}
+
+.terms-foot {
+  padding: 14px 22px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  background: #ffffff;
+}
+
+@media (max-width: 640px) {
+  #termsModal {
+    padding: 12px;
+  }
+  .terms-head {
+    padding: 14px 16px;
+  }
+  .terms-head h2 {
+    font-size: 16.5px;
+  }
+  .terms-body {
+    padding: 14px 16px;
+    font-size: 13.5px;
+  }
+  .terms-foot {
+    padding: 12px 16px;
+  }
+}

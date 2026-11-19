@@ -18,7 +18,7 @@
     <div class=footer-col>
       <h4>Hỗ trợ &amp; An toàn</h4>
       <ul class=footer-links>
-        <li><a href=terms.html target=_blank>Điều khoản &amp; Quy chế bán vé</a></li>
+        <li><a href="#" onclick="openTermsModal();return false">Điều khoản &amp; Quy chế bán vé</a></li>
         <li><a href="#" onclick="openSecurityModal();return false">Xác thực Email &amp; Bảo mật OTP</a></li>
         <li><a href="#" onclick="showChainInfo();return false">Kiểm tra Smart Contract Explorer</a></li>
         <li><a href="mailto:support@avatix.vn">Liên hệ: support@avatix.vn</a></li>
@@ -248,7 +248,7 @@ function confirmBuy(path,body,id,src){
   </table>
   ${hasEnoughBal?'':`<p class="note err">⚠️ Số dư ví không đủ. Vui lòng Nạp tiền trước khi mua.</p>`}
   <p class=note>Note: Kiểm tra thông tin. Sau khi bấm xác nhận, hệ thống sẽ gửi mã OTP về email của bạn để xác thực thanh toán.</p>
-  <div class=chk><input type=checkbox id=ag onchange="$('#ok').disabled=!this.checked||!${hasEnoughBal}"><span>Tôi đã đọc, hiểu và cam kết với <span class=tip><a href=terms.html target=_blank>điều khoản và chính sách</a><a class=pop href=terms.html target=_blank>Mở Điều khoản &amp; Chính sách ↗</a></span> của AVA-TIX.</span></div>
+  <div class=chk><input type=checkbox id=ag onchange="$('#ok').disabled=!this.checked||!${hasEnoughBal}"><span>Tôi đã đọc, hiểu và cam kết với <span class=tip><a href="#" onclick="openTermsModal();return false">điều khoản và chính sách</a><a class=pop href="#" onclick="openTermsModal();return false">Xem Điều khoản &amp; Chính sách</a></span> của AVA-TIX.</span></div>
   <div class=row><button class="btn ghost" onclick=closeModal()>Hủy</button><button id=ok class=btn disabled>${hasEnoughBal?'Xác nhận &amp; Gửi mã OTP':'Số dư không đủ'}</button></div>`);
 
  $('#ok').onclick=async()=>{
