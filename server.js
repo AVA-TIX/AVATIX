@@ -321,7 +321,7 @@ route('post', 'events', 'organizer', async r => {
   const image = String(b.image || '').trim();
   const maxPerUser = Math.max(0, parseInt(b.max_per_user, 10) || 0);
   if (!name || !venue) throw E('Nhập đủ tên sự kiện và địa điểm');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(b.date || '') || b.date < new Date().toISOString().slice(0, 10)) throw E('Ngày tổ chức không hợp lệ');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(b.date || '') || b.date < new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10)) throw E('Ngày tổ chức không hợp lệ');
   const price = int(b.price, 0, 100000000, 'Giá vé không hợp lệ'), total = int(b.total, 1, 100000, 'Số lượng vé phải là số nguyên dương');
   await db.run('INSERT INTO events(org,name,date,venue,price,total,remain,description,image,status,max_per_user) VALUES(?,?,?,?,?,?,?,?,?,\'active\',?)', [r.u.id, name, b.date, venue, price, total, total, desc, image, maxPerUser]);
   return { ok: 1 };
@@ -570,14 +570,24 @@ route('post', 'scan', 'organizer', async r => {
     const totpTs = Number(w) * STEP;
     chainRes = await chain.onScanTicket(t.token_id, totpTs);
   }
-  await log(r.u.id, 'scan', 0, `Check-in vé #${t.id}: ${t.name}`, chainRes?.txHash || null);
+  await log(r.u.id, 'scan', 0, `Check-in vé #${t.id}: ${t.name}`, chainRes?.txHash || null, t.event);
   return { ok: 1, msg: `Check-in thành công: ${t.name} (vé #${t.id})`, tokenId: t.token_id || null, txHash: chainRes?.txHash || null, explorerUrl: chain.explorerUrl(chainRes?.txHash), chainEnabled: chain.isEnabled() };
 });
 
 // ─── Lịch sử giao dịch ───────────────────────────────────────────────────────
+const fmtVnTime = s => {
+  const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}:\d{2}:\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}` : String(s || '');
+};
+
 route('get', 'history', true, async r => {
-  const rows = await db.all('SELECT * FROM txs WHERE user=? ORDER BY id DESC LIMIT 50', [r.u.id]);
-  return rows.map(tx => ({ ...tx, explorerUrl: chain.explorerUrl(tx.tx_hash), snowtraceUrl: chain.explorerUrl(tx.tx_hash) }));
+  const rows = await db.all("SELECT *, datetime(at, '+7 hours') AS at_vn FROM txs WHERE user=? ORDER BY id DESC LIMIT 50", [r.u.id]);
+  return rows.map(tx => ({
+    ...tx,
+    at: fmtVnTime(tx.at_vn || tx.at),
+    explorerUrl: chain.explorerUrl(tx.tx_hash),
+    snowtraceUrl: chain.explorerUrl(tx.tx_hash)
+  }));
 });
 
 // ─── Static + Error handler ───────────────────────────────────────────────────
