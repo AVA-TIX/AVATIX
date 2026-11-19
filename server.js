@@ -77,8 +77,8 @@ const auth = role => async (r, s, n) => {
   } catch (e) { n(e); }
 };
 const route = (m, p, role, f) => app[m]('/api/' + p, ...(role ? [auth(role)] : []), (r, s, n) => Promise.resolve().then(() => f(r, s)).then(d => s.json(d)).catch(n));
-const log = async (u, t, a, n, txHash = null) => {
-  const r = await db.run('INSERT INTO txs(user,type,amount,note,tx_hash) VALUES(?,?,?,?,?)', [u, t, a, n, txHash]);
+const log = async (u, t, a, n, txHash = null, eventId = null) => {
+  const r = await db.run('INSERT INTO txs(user,type,amount,note,tx_hash,event_id) VALUES(?,?,?,?,?,?)', [u, t, a, n, txHash, eventId]);
   return r.lastInsertRowid;
 };
 
@@ -344,13 +344,13 @@ route('post', 'events/:id/cancel', 'organizer', async r => {
     // Đánh dấu vé đã hoàn tiền (used=2), hủy niêm yết bán lại
     await db.run('UPDATE tickets SET used=2, listed=NULL WHERE id=?', [t.id]);
     // Ghi log giao dịch hoàn tiền cho khán giả
-    await log(t.owner, 'refund', t.orig, `Hoàn tiền 100%: Show "${ev.name}" bị hủy (Vé #${t.id})`);
+    await log(t.owner, 'refund', t.orig, `Hoàn tiền 100%: Show "${ev.name}" bị hủy (Vé #${t.id})`, null, evId);
   }
 
   // Trừ doanh thu tương ứng từ tài khoản BTC
   const orgDeduct = Math.round(totalRefund * (1 - FEE));
   await db.run('UPDATE users SET balance=balance-? WHERE id=?', [orgDeduct, r.u.id]);
-  await log(r.u.id, 'refund', -orgDeduct, `Hoàn trả doanh thu: Hủy show "${ev.name}" (${tickets.length} vé)`);
+  await log(r.u.id, 'refund', -orgDeduct, `Hoàn trả doanh thu: Hủy show "${ev.name}" (${tickets.length} vé)`, null, evId);
 
   // Đổi trạng thái sự kiện sang cancelled (giữ nguyên tồn kho cũ để tránh lỗi tính sai số vé đã bán)
   await db.run("UPDATE events SET status='cancelled' WHERE id=?", [evId]);
@@ -398,8 +398,24 @@ route('get', 'stats', 'organizer', async r => {
   return result;
 });
 
+route('get', 'stats/daily', 'organizer', async r => {
+  const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+  const rows = await db.all(`
+    SELECT t.event AS event_id,
+           substr(datetime(COALESCE(t.created_at, CURRENT_TIMESTAMP), '+7 hours'), 1, 10) AS day,
+           COUNT(*) AS qty,
+           SUM(ROUND(t.orig * (1 - ?))) AS revenue
+    FROM tickets t
+    JOIN events e ON e.id = t.event
+    WHERE e.org = ? AND t.used != 2 AND (e.status != 'cancelled' OR e.status IS NULL)
+    GROUP BY t.event, substr(datetime(COALESCE(t.created_at, CURRENT_TIMESTAMP), '+7 hours'), 1, 10)
+    ORDER BY day ASC
+  `, [FEE, r.u.id]);
+  return { today, rows };
+});
+
 // ─── Pay helper ───────────────────────────────────────────────────────────────
-const pay = async (buyer, seller, price, note) => {
+const pay = async (buyer, seller, price, note, eventId = null) => {
   const b = await db.get('SELECT balance FROM users WHERE id=?', [buyer]);
   if (b.balance < price) throw E('Số dư ví không đủ, vui lòng nạp thêm');
   const net = Math.round(price * (1 - FEE));
@@ -407,8 +423,8 @@ const pay = async (buyer, seller, price, note) => {
     { sql: 'UPDATE users SET balance=balance-? WHERE id=?', args: [price, buyer] },
     { sql: 'UPDATE users SET balance=balance+? WHERE id=?', args: [net, seller] },
   ]);
-  const buyerTxId  = await log(buyer,  'buy',  -price, note);
-  const sellerTxId = await log(seller, 'sale',  net,   note);
+  const buyerTxId  = await log(buyer,  'buy',  -price, note, null, eventId);
+  const sellerTxId = await log(seller, 'sale',  net,   note, null, eventId);
   return { buyerTxId, sellerTxId };
 };
 
@@ -438,9 +454,9 @@ route('post', 'buy', 'customer', async r => {
       throw E(`Chống gom vé: Sự kiện này giới hạn mỗi khán giả chỉ được mua tối đa ${e.max_per_user} vé`);
     }
   }
-  const { buyerTxId, sellerTxId } = await pay(r.u.id, e.org, e.price, e.name);
+  const { buyerTxId, sellerTxId } = await pay(r.u.id, e.org, e.price, e.name, e.id);
   await db.run('UPDATE events SET remain=remain-1 WHERE id=?', [eventId]);
-  const ins = await db.run('INSERT INTO tickets(event,owner,orig) VALUES(?,?,?)', [eventId, r.u.id, e.price]);
+  const ins = await db.run('INSERT INTO tickets(event,owner,orig,created_at) VALUES(?,?,?,CURRENT_TIMESTAMP)', [eventId, r.u.id, e.price]);
   const ticketId = Number(ins.lastInsertRowid);
   const chainRes = await chain.onBuyPrimary(ticketId, r.u.wallet, e.id, e.price);
   if (chainRes) {
@@ -510,7 +526,7 @@ route('post', 'buy-resale', 'customer', async r => {
     }
   }
 
-  const { buyerTxId, sellerTxId } = await pay(r.u.id, t.owner, t.listed, t.name + ' (bán lại)');
+  const { buyerTxId, sellerTxId } = await pay(r.u.id, t.owner, t.listed, t.name + ' (bán lại)', t.event);
   await db.run('UPDATE tickets SET owner=?,listed=NULL WHERE id=?', [r.u.id, ticketId]);
   let chainRes = null;
   if (isActiveContractTicket(t)) {

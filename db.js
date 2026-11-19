@@ -119,12 +119,14 @@ async function _migrate(db) {
        id INTEGER PRIMARY KEY,
        event INTEGER, owner INTEGER, orig INTEGER,
        listed INTEGER, used INTEGER DEFAULT 0,
-       token_id INTEGER, tx_hash TEXT, contract_addr TEXT
+       token_id INTEGER, tx_hash TEXT, contract_addr TEXT,
+       created_at TEXT DEFAULT CURRENT_TIMESTAMP
      )`,
     `CREATE TABLE IF NOT EXISTS txs(
        id INTEGER PRIMARY KEY,
        user INTEGER, type TEXT, amount INTEGER,
        note TEXT, tx_hash TEXT,
+       event_id INTEGER,
        at TEXT DEFAULT CURRENT_TIMESTAMP
      )`,
     `CREATE TABLE IF NOT EXISTS otps(
@@ -151,13 +153,32 @@ async function _migrate(db) {
     { check: `PRAGMA table_info(tickets)`, col: 'token_id',       sql: `ALTER TABLE tickets ADD COLUMN token_id INTEGER` },
     { check: `PRAGMA table_info(tickets)`, col: 'tx_hash',        sql: `ALTER TABLE tickets ADD COLUMN tx_hash TEXT` },
     { check: `PRAGMA table_info(tickets)`, col: 'contract_addr',  sql: `ALTER TABLE tickets ADD COLUMN contract_addr TEXT` },
+    { check: `PRAGMA table_info(tickets)`, col: 'created_at',     sql: `ALTER TABLE tickets ADD COLUMN created_at TEXT` },
     { check: `PRAGMA table_info(txs)`,     col: 'tx_hash',        sql: `ALTER TABLE txs     ADD COLUMN tx_hash TEXT` },
+    { check: `PRAGMA table_info(txs)`,     col: 'event_id',       sql: `ALTER TABLE txs     ADD COLUMN event_id INTEGER` },
   ];
 
   for (const m of migrations) {
     const cols = await db.all(m.check);
     if (!cols.some(c => c.name === m.col)) {
       try { await db.run(m.sql); } catch (_) { /* cột đã tồn tại */ }
+    }
+  }
+
+  // Backfill created_at cho vé cũ chưa có ngày tạo (dựa theo lịch sử txs nếu khớp)
+  const missingCreated = await db.all('SELECT t.id, t.event, e.name as event_name FROM tickets t LEFT JOIN events e ON e.id = t.event WHERE t.created_at IS NULL');
+  if (missingCreated.length) {
+    const buyTxs = await db.all("SELECT id, note, at FROM txs WHERE type='buy' ORDER BY id ASC");
+    const txByName = new Map();
+    for (const tx of buyTxs) {
+      if (!txByName.has(tx.note)) txByName.set(tx.note, []);
+      txByName.get(tx.note).push(tx.at);
+    }
+    const nowFallback = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    for (const tk of missingCreated) {
+      const pool = txByName.get(tk.event_name);
+      const ts = (pool && pool.length) ? pool.shift() : nowFallback;
+      await db.run('UPDATE tickets SET created_at=? WHERE id=?', [ts, tk.id]);
     }
   }
 
