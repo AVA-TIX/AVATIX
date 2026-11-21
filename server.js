@@ -11,6 +11,7 @@ const app = express();
 app.use(express.json({ limit: '12mb' }));
 app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 const SECRET = process.env.SECRET || 'avatix-dev-secret-doi-khi-deploy';
+require('./chain-jobs')(db, chain);
 const pinSecurity = require('./pin-security')(db, SECRET);
 const FEE = 0.05, CAP = 1.1, METHODS = ['momo', 'bank', 'vnpay', 'vietqr'];
 
@@ -81,7 +82,7 @@ const auth = role => async (r, s, n) => {
     }
   } catch (e) { n(e); }
 };
-const route = (m, p, role, f) => app[m]('/api/' + p, ...(role ? [auth(role)] : []), (r, s, n) => Promise.resolve().then(() => f(r, s)).then(d => s.json(d)).catch(n));
+const route = (m, p, role, f) => app[m]('/api/' + p, ...(role ? [auth(role)] : []), (r, s, n) => Promise.resolve().then(async () => { if (m === 'post' && ['buy','buy-resale'].includes(p) && !isDemoOtpBypass(r.u)) { const code=String(r.body.code || '').trim(); if (!code) throw E('Vui lòng nhập mã OTP để xác nhận mua vé'); await verifyOtp(r.u.id,'buy_ticket',code); } return (m === 'post' && /^(buy$|buy-resale$|list$|unlist$|scan$|topup$|(?:admin\/)?events\/:id\/cancel$)/.test(p)) ? db.transaction(() => f(r, s)) : f(r, s); }).then(d => s.json(d)).catch(n));
 const log = async (u, t, a, n, txHash = null, eventId = null) => {
   const r = await db.run('INSERT INTO txs(user,type,amount,note,tx_hash,event_id) VALUES(?,?,?,?,?,?)', [u, t, a, n, txHash, eventId]);
   return r.lastInsertRowid;
@@ -541,6 +542,8 @@ route('get', 'stats/daily', 'organizer', async r => {
   return { today, rows };
 });
 
+route('get', 'chain-jobs', true, async r => ({ jobs: await db.all('SELECT j.id,j.action,j.state,j.tx_hash,j.error,j.created_at FROM chain_jobs j JOIN tickets t ON t.id=j.ticket_id WHERE t.owner=? ORDER BY j.id DESC LIMIT 50',[r.u.id]) }));
+
 // ─── Pay helper ───────────────────────────────────────────────────────────────
 const pay = async (buyer, seller, price, note, eventId = null) => {
   const b = await db.get('SELECT balance FROM users WHERE id=?', [buyer]);
@@ -555,7 +558,7 @@ const pay = async (buyer, seller, price, note, eventId = null) => {
   return { buyerTxId, sellerTxId };
 };
 
-const isActiveContractTicket = t => t && t.token_id && chain.isEnabled() &&
+const isActiveContractTicket = t => t && chain.isEnabled() &&
   (!t.contract_addr || t.contract_addr === chain.getStatus().avaTicketAddress);
 
 // ─── Buy (Primary) & Buy OTP ──────────────────────────────────────────────────
@@ -568,16 +571,13 @@ route('post', 'buy/request-otp', 'customer', async r => {
 });
 
 route('post', 'buy', 'customer', async r => {
-  if (!isDemoOtpBypass(r.u)) {
-    const code = String(r.body.code || '').trim();
-    if (!code) throw E('Vui lòng nhập mã OTP để xác nhận mua vé');
-    await verifyOtp(r.u.id, 'buy_ticket', code);
-  }
+
 
   const eventId = +r.body.event;
   const e = await db.get('SELECT * FROM events WHERE id=?', [eventId]);
   if (!e) throw E('Không tìm thấy sự kiện');
   if (e.status === 'cancelled') throw E('Sự kiện này đã bị hủy, không thể mua vé');
+  if (String(e.date) < new Date(Date.now()+7*3600000).toISOString().slice(0,10)) throw E('Sự kiện đã kết thúc');
   if (e.remain <= 0) throw E('Sự kiện đã SOLD OUT');
 
   if (e.max_per_user > 0) {
@@ -601,7 +601,7 @@ route('post', 'buy', 'customer', async r => {
 
 // ─── Tickets & Market ─────────────────────────────────────────────────────────
 route('get', 'tickets', 'customer', r => db.all(
-  'SELECT t.*,e.name,e.date,e.venue,e.description,e.image,e.status event_status,e.max_per_user,u.username org FROM tickets t JOIN events e ON e.id=t.event JOIN users u ON u.id=e.org WHERE t.owner=? ORDER BY t.id DESC', [r.u.id]
+  'SELECT t.*,e.name,e.date,e.venue,e.description,e.image,e.status event_status,e.date,e.max_per_user,u.username org FROM tickets t JOIN events e ON e.id=t.event JOIN users u ON u.id=e.org WHERE t.owner=? ORDER BY t.id DESC', [r.u.id]
 ));
 
 route('get', 'tickets/:id/chain', true, async r => {
@@ -614,13 +614,15 @@ route('get', 'tickets/:id/chain', true, async r => {
 route('post', 'list', 'customer', async r => {
   const t = await db.get('SELECT * FROM tickets WHERE id=? AND owner=?', [+r.body.ticket, r.u.id]);
   if (!t) throw E('Bạn không sở hữu vé này');
-  if (t.used) throw E('Vé đã check-in, không thể bán lại');
+  if (t.used) throw E('Vé không còn hiệu lực để bán lại');
+  const event = await db.get('SELECT date,status FROM events WHERE id=?',[t.event]);
+  if (!event || event.status === 'cancelled' || String(event.date) < new Date(Date.now()+7*3600000).toISOString().slice(0,10)) throw E('Sự kiện đã kết thúc hoặc bị hủy');
   const max = Math.floor(t.orig * CAP), p = int(r.body.price, 1, Infinity, 'Giá không hợp lệ');
   if (p > max) throw E('Chống phe vé: giá bán tối đa là ' + max.toLocaleString('vi-VN') + 'đ (giá gốc + 10%)');
   await db.run('UPDATE tickets SET listed=? WHERE id=?', [p, t.id]);
   let chainRes = null;
   if (isActiveContractTicket(t)) {
-    chainRes = await chain.onListResale(t.token_id, r.u.wallet, p);
+    chainRes = await chain.onListResale(t.token_id, r.u.wallet, p, t.id);
     if (chainRes?.txHash) await log(r.u.id, 'list', 0, `Đăng bán vé #${t.id} (NFT #${t.token_id}) giá ${p.toLocaleString('vi-VN')}đ`, chainRes.txHash);
   }
   return { ok: 1, txHash: chainRes?.txHash || null, explorerUrl: chain.explorerUrl(chainRes?.txHash) };
@@ -631,7 +633,7 @@ route('post', 'unlist', 'customer', async r => {
   if (!t) throw E('Bạn không sở hữu vé này');
   await db.run('UPDATE tickets SET listed=NULL WHERE id=? AND owner=?', [t.id, r.u.id]);
   let chainRes = null;
-  if (isActiveContractTicket(t)) chainRes = await chain.onUnlistResale(t.token_id, r.u.wallet);
+  if (isActiveContractTicket(t)) chainRes = await chain.onUnlistResale(t.token_id, r.u.wallet, t.id);
   return { ok: 1, txHash: chainRes?.txHash || null };
 });
 
@@ -641,15 +643,12 @@ route('get', 'market', 'customer', () => db.all(
 
 // ─── Buy Resale ───────────────────────────────────────────────────────────────
 route('post', 'buy-resale', 'customer', async r => {
-  if (!isDemoOtpBypass(r.u)) {
-    const code = String(r.body.code || '').trim();
-    if (!code) throw E('Vui lòng nhập mã OTP để xác nhận mua lại vé');
-    await verifyOtp(r.u.id, 'buy_ticket', code);
-  }
+
 
   const ticketId = +r.body.ticket;
-  const t = await db.get('SELECT t.*,e.name,e.status event_status,e.max_per_user FROM tickets t JOIN events e ON e.id=t.event WHERE t.id=? AND t.listed IS NOT NULL AND t.used=0', [ticketId]);
+  const t = await db.get('SELECT t.*,e.name,e.status event_status,e.date,e.max_per_user FROM tickets t JOIN events e ON e.id=t.event WHERE t.id=? AND t.listed IS NOT NULL AND t.used=0', [ticketId]);
   if (!t) throw E('Vé không còn được rao bán');
+  if (String(t.date) < new Date(Date.now()+7*3600000).toISOString().slice(0,10)) throw E('Sự kiện đã kết thúc');
   if (t.event_status === 'cancelled') throw E('Sự kiện này đã bị hủy, không thể giao dịch vé');
   if (t.owner === r.u.id) throw E('Không thể tự mua vé của mình');
 
@@ -664,7 +663,7 @@ route('post', 'buy-resale', 'customer', async r => {
   await db.run('UPDATE tickets SET owner=?,listed=NULL WHERE id=?', [r.u.id, ticketId]);
   let chainRes = null;
   if (isActiveContractTicket(t)) {
-    chainRes = await chain.onBuyResale(t.token_id, r.u.wallet);
+    chainRes = await chain.onBuyResale(t.token_id, r.u.wallet, t.id);
     if (chainRes?.txHash) {
       await db.run('UPDATE tickets SET tx_hash=? WHERE id=?', [chainRes.txHash, t.id]);
       await db.run('UPDATE txs SET tx_hash=? WHERE id IN (?,?)', [chainRes.txHash, buyerTxId, sellerTxId]);
@@ -694,8 +693,9 @@ route('post', 'scan', 'organizer', async r => {
   const p = String(r.body.token || '').trim().split('|'), [tag, id, own, w, sg] = p;
   if (tag !== 'AVATIX' || p.length !== 5 || sign(`${id}|${own}|${w}`) !== sg) throw E('Mã QR không hợp lệ');
   if (W() - Number(w) > 1 || Number(w) > W()) throw E('Mã QR đã hết hạn (ảnh chụp màn hình không có giá trị)');
-  const t = await db.get('SELECT t.*,e.org,e.name FROM tickets t JOIN events e ON e.id=t.event WHERE t.id=?', [+id]);
+  const t = await db.get('SELECT t.*,e.org,e.name,e.date FROM tickets t JOIN events e ON e.id=t.event WHERE t.id=?', [+id]);
   if (!t || t.org !== r.u.id) throw E('Vé không thuộc sự kiện của bạn');
+  if (String(t.date) !== new Date(Date.now()+7*3600000).toISOString().slice(0,10)) throw E('Chỉ được check-in trong ngày sự kiện');
   if (t.owner !== +own) throw E('Vé đã đổi chủ, mã cũ không còn hiệu lực');
   if (t.used === 2) throw E('Vé không hợp lệ: Sự kiện đã bị hủy và tiền vé đã hoàn trả cho khán giả');
   if (t.used) throw E('Vé đã được sử dụng trước đó');
@@ -703,7 +703,7 @@ route('post', 'scan', 'organizer', async r => {
   let chainRes = null;
   if (isActiveContractTicket(t)) {
     const totpTs = Number(w) * STEP;
-    chainRes = await chain.onScanTicket(t.token_id, totpTs);
+    chainRes = await chain.onScanTicket(t.token_id, totpTs, t.id);
   }
   await log(r.u.id, 'scan', 0, `Check-in vé #${t.id}: ${t.name}`, chainRes?.txHash || null, t.event);
   return { ok: 1, msg: `Check-in thành công: ${t.name} (vé #${t.id})`, tokenId: t.token_id || null, txHash: chainRes?.txHash || null, explorerUrl: chain.explorerUrl(chainRes?.txHash), chainEnabled: chain.isEnabled() };

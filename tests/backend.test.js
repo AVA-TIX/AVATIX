@@ -25,8 +25,8 @@ test('account avatar and email-only OTP API', async t => {
     });
     return { status: response.status, body: await response.json(), cookie: response.headers.get('set-cookie')?.split(';')[0] };
   };
-  const login = async username => {
-    const response = await request('login', { username, password: 'Demo@2025' });
+  const login = async (username, password = 'Demo@2025') => {
+    const response = await request('login', { username, password });
     assert.equal(response.status, 200);
     cookie = response.cookie;
   };

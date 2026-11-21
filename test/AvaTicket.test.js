@@ -101,4 +101,18 @@ describe("AVA-TIX Smart Contracts", function () {
       marketplace.connect(buyer).buyPrimaryTicket(buyer.address, 1, 500000, "General")
     ).to.be.revertedWith("Chi Admin duoc goi");
   });
+
+  it("rejects phantom transfers and removes previous owner index", async()=>{
+    await expect(avaTicket.transferOwnership(999,buyer.address)).to.be.revertedWith('Ticket does not exist');
+    await marketplace.buyPrimaryTicket(buyer.address,1,100,'Test');
+    await avaTicket.transferOwnership(1,seller.address);
+    expect(await avaTicket.getOwnerTickets(buyer.address)).to.deep.equal([]);
+    expect(await avaTicket.getOwnerTickets(seller.address)).to.deep.equal([1n]);
+  });
+  it("rejects stale listing after privileged ownership transfer",async()=>{
+    await marketplace.buyPrimaryTicket(buyer.address,1,100,'Test');
+    await marketplace.listResale(1,buyer.address,100);
+    await avaTicket.transferOwnership(1,seller.address);
+    await expect(marketplace.buyResale(1,admin.address)).to.be.revertedWith('Stale listing owner');
+  });
 });

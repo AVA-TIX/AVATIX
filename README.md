@@ -230,3 +230,11 @@ Các file logo sẵn sàng cho Website, GitHub và Slide Pitch Deck được lư
 
 * Thanh toán nạp tiền VNĐ (`MoMo / Ngân hàng / VNPAY / VietQR`) đang ở chế độ mô phỏng phục vụ trải nghiệm 1-chạm; không sử dụng khóa ví testnet hoặc `SECRET` mặc định cho môi trường Mainnet thực tế.
 * Luôn giữ `.env`, API Key (Brevo/SMTP), `RELAYER_KEY` và `ADMIN_PASS` ngoài Git (`.env` đã nằm trong `.gitignore`).
+
+## Phạm vi và độ tin cậy
+
+Vé hiện là custom registry, chưa phải ERC-721; relayer không phải ERC-4337. QR xoay 20 giây có dung sai, không bảo đảm chặn ảnh mới chụp. VNĐ mô phỏng, không có atomic settlement tiền-vé trên chain.
+
+Nghiệp vụ mua, bán lại, check-in và hủy/hoàn tiền chạy trong write transaction bao gồm cả kiểm tra. Hàng đợi `chain_jobs` được ghi cùng giao dịch database và gửi Fuji sau commit. API `/api/chain-jobs` cho chủ vé xem trạng thái. `confirmed` mới là đã xác nhận; `submitted`, `uncertain`, `processing` sau sự cố cần đối soát hash, tuyệt đối không gửi lại tự động. Khi mint chưa xác nhận, thao tác phụ thuộc bị blocked để tránh tác động sai vé. Hủy show hiện chỉ được ghi trong ứng dụng.
+
+Đọc [điều khoản demo](public/policies.html). Không dùng dữ liệu định danh hay tiền thật. Thay đổi hợp đồng trong repo chỉ có hiệu lực sau deploy hợp đồng mới và cấu hình địa chỉ; địa chỉ Fuji cũ không tự cập nhật.

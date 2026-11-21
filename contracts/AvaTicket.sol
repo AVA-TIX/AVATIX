@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 /**
  * @title AvaTicket
- * @dev ERC-721 Smart Contract đại diện cho vé sự kiện số hóa trên Avalanche C-Chain
+ * @dev Custom ticket registry (not ERC-721) đại diện cho vé sự kiện số hóa trên Avalanche C-Chain
  * Hỗ trợ xác thực mã QR động (TOTP) và trạng thái check-in cổng sự kiện.
  */
 contract AvaTicket {
@@ -70,8 +70,13 @@ contract AvaTicket {
     function transferOwnership(uint256 ticketId, address to) external onlyMarketplace {
         require(to != address(0), "Dia chi khong hop le");
         TicketData storage t = tickets[ticketId];
+        require(t.owner != address(0), "Ticket does not exist");
         require(!t.isCheckedIn, "Ve da check-in khong the chuyen nhuong");
         address from = t.owner;
+        uint256[] storage previous = ownerTickets[from];
+        for (uint256 i=0; i<previous.length; i++) {
+            if (previous[i] == ticketId) { previous[i]=previous[previous.length-1]; previous.pop(); break; }
+        }
         t.owner = to;
         t.seatInfo = string(abi.encodePacked(t.seatInfo, " [resold]"));
         ownerTickets[to].push(ticketId);

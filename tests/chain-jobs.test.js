@@ -1,0 +1,20 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');
+process.env.DB=':memory:';process.env.TURSO_DATABASE_URL='';process.env.TURSO_AUTH_TOKEN='';
+const db=require('../db');
+test('durable outbox commits with business transaction and never retries uncertain writes',async()=>{
+ await db.migrate();let observer=null,calls=0;
+ const chain={isEnabled:()=>true,setTransactionObserver:f=>observer=f,getStatus:()=>({avaTicketAddress:'0xcontract'}),onBuyPrimary:async()=>{calls++;await observer('0xmint');return {tokenId:42,txHash:'0xmint'}},onListResale:async()=>{calls++;await observer('0xpending');return null},onUnlistResale:async()=>{throw Error('must not run')},onBuyResale:async()=>null,onScanTicket:async()=>null};
+ const worker=require('../chain-jobs')(db,chain);worker.stop();
+ await db.run('INSERT INTO tickets(id,event,owner,orig) VALUES(101,1,1,100)');
+ await assert.rejects(db.transaction(async()=>{await chain.onBuyPrimary(101,'0xbuyer',1,100);throw Error('rollback')}));
+ assert.equal((await db.get('SELECT COUNT(*) n FROM chain_jobs')).n,0);
+ await db.transaction(()=>chain.onBuyPrimary(101,'0xbuyer',1,100));
+ assert.equal(calls,0);await worker.tick();
+ assert.equal((await db.get('SELECT token_id FROM tickets WHERE id=101')).token_id,42);
+ assert.equal((await db.get('SELECT state FROM chain_jobs')).state,'confirmed');
+ await chain.onListResale(42,'0xbuyer',100,101);await worker.tick();
+ const pending=await db.get("SELECT * FROM chain_jobs WHERE action='onListResale'");assert.equal(pending.state,'uncertain');assert.equal(pending.tx_hash,'0xpending');
+ await worker.tick();assert.equal(calls,2);
+ await chain.onUnlistResale(42,'0xbuyer',101);await worker.tick();
+ assert.equal((await db.get("SELECT state FROM chain_jobs WHERE action='onUnlistResale'")).state,'blocked');
+});

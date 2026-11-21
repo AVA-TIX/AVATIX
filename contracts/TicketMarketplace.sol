@@ -6,7 +6,7 @@ import "./AvaTicket.sol";
 /**
  * @title TicketMarketplace
  * @dev Sàn giao dịch sơ cấp và thứ cấp có giá trần (Capped Resale)
- * Atomic Swap: Mint vé + thanh toán trong 1 transaction.
+ * Ownership is recorded on-chain; VND payment is maintained off-chain.
  * Backend (Admin) hoạt động như relayer: gọi hàm thay cho user, record txHash.
  */
 contract TicketMarketplace {
@@ -124,6 +124,7 @@ contract TicketMarketplace {
         require(listing.active,         "Ve khong con duoc rao ban");
         require(buyer != listing.seller, "Khong the tu mua ve cua chinh minh");
 
+        require(ticketContract.getTicket(ticketId).owner == listing.seller, "Stale listing owner");
         listing.active = false;
         address seller = listing.seller;
         uint256 price  = listing.resalePrice;

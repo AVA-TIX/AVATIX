@@ -106,6 +106,7 @@ async function init() {
 }
 
 // ─── Serialized transaction runner (tránh đụng nonce khi nhiều request đồng thời) ──
+let transactionObserver = null;
 function callContract(label, fn) {
   if (!enabled) return Promise.resolve(null);
   const run = txQueue.then(async () => {
@@ -115,6 +116,7 @@ function callContract(label, fn) {
       const nonce = currentNonce;
       const tx = await fn({ nonce });
       currentNonce = nonce + 1;
+      if (transactionObserver) await transactionObserver(tx.hash);
       const receipt = await Promise.race([
         tx.wait(),
         new Promise((_, rej) => setTimeout(() => rej(new Error("TX confirmation timeout (20s)")), 20000)),
@@ -256,6 +258,7 @@ async function getRelayerBalance() {
 }
 
 module.exports = {
+  setTransactionObserver: observer => { transactionObserver = observer; },
   init,
   getWalletAddress,
   onBuyPrimary,
