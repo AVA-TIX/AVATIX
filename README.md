@@ -17,6 +17,24 @@
 
 ---
 
+## 🎯 Hướng dẫn trải nghiệm nhanh cho Ban Giám Khảo
+
+Truy cập trực tiếp bản Live Demo tại: **https://demoavatix.onrender.com**
+
+### Tài khoản mẫu (1-click trên trang Đăng nhập)
+
+| Vai trò | Tên đăng nhập | Mật khẩu | Ghi chú trải nghiệm |
+|---|---|---|---|
+| **Khách hàng** | `demo_customer` | `Demo@2025` | Có sẵn số dư VNĐ; hỗ trợ mua vé 1-chạm (`DEMO_OTP_BYPASS=1`), mở QR động 20s, đăng bán lại trần 110% và xem `txHash` Snowtrace. |
+| **Ban tổ chức** | `demo_organizer` | `Demo@2025` | Đã duyệt sẵn; tạo sự kiện mới, xem biểu đồ doanh thu đa đường theo ngày, dùng Camera QR Scanner soát vé tại cổng và hủy show hoàn tiền 100%. |
+| **Quản trị viên (`/admin.html`)** | *(Riêng tư)* | *(Riêng tư)* | Không đặt nút 1-click công khai vì lý do bảo mật. **Thông tin đăng nhập Admin dành riêng cho Ban Giám Khảo được đính kèm trong hồ sơ nộp bài trên Avalanche Builder Hub.** |
+
+### Lưu ý khi mở mã QR vé & thử luồng Email OTP thật
+* **Mở mã QR động 20 giây (PIN 6 số):** Đăng nhập **không** cần PIN. Khi bấm **Mở mã QR vào cổng** trên vé, nếu tài khoản chưa có PIN thì hệ thống mời tự tạo mã PIN 6 số ngay tại chỗ; nếu tài khoản demo trên bản live đã được thiết lập PIN trước đó, mã PIN trải nghiệm được ghi kèm trong phần ghi chú nộp bài cho Ban Giám Khảo.
+* **Trải nghiệm Email OTP thật (Brevo):** Giám khảo có thể đăng ký 1 tài khoản mới bằng địa chỉ Gmail cá nhân để nhận mã OTP 6 số thật gửi trực tiếp về hộp thư khi xác thực tài khoản và mua vé.
+
+---
+
 ## 1. Tổng quan & Bài toán giải quyết
 
 Thị trường vé sự kiện tại Việt Nam thường gặp 4 vấn đề lớn: **lừa đảo vé giả / chụp ảnh màn hình QR**, **phe vé đầu cơ đẩy giá gấp nhiều lần**, **gom vé hàng loạt bằng tài khoản ảo**, và **rủi ro mất tiền khi sự kiện bị hủy**.
