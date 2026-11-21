@@ -354,7 +354,3 @@ function parseDateBadge(dStr){
   if(parts.length===3) return {m:`THG ${parseInt(parts[1],10)}`,d:parts[2]};
   return{m:'THG --',d:'--'};
 }
-
-document.addEventListener('DOMContentLoaded',()=>{const notice=document.createElement('aside');notice.style.cssText='padding:14px;text-align:center;font:14px/1.6 system-ui;background:#172235;color:#f4f6ff';notice.innerHTML='Demo: số dư và thanh toán được mô phỏng. Ghi nhận ứng dụng khác với xác nhận Fuji. <a style="color:#a9d1ff" href="/policies.html">Điều khoản & quyền riêng tư</a>';document.body.append(notice);});
-
-document.addEventListener('DOMContentLoaded',()=>{if(location.pathname.endsWith('login.html'))return;const status=document.createElement('aside');status.style.cssText='padding:12px;background:#172235;color:#fff;text-align:center';document.body.prepend(status);const refresh=async()=>{try{const response=await fetch('/api/chain-jobs');if(!response.ok)return;const data=await response.json();const pending=data.jobs.filter(j=>j.state!=='confirmed');status.textContent=pending.length?'Fuji: '+pending.length+' giao dịch chưa xác nhận. Trạng thái: '+[...new Set(pending.map(j=>j.state))].join(', ')+'. Không lặp lại thao tác; liên hệ nhóm nếu trạng thái uncertain/blocked.':'Fuji: không có giao dịch đang chờ trong lịch sử gần đây.';}catch{status.textContent='Chưa đọc được trạng thái Fuji.';}};refresh();setInterval(refresh,15000);});
