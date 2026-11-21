@@ -1,1 +1,31 @@
-{"name":"avatix-dapp","version":"2.0.0","private":true,"scripts":{"start":"node server.js","chain":"npx hardhat node","test:contracts":"npx hardhat test","deploy:local":"npx hardhat run scripts/deploy.js --network localhost","deploy:fuji":"npx hardhat run scripts/deploy.js --network fuji"},"dependencies":{"@libsql/client":"^0.18.0","better-sqlite3":"^11.5.0","dotenv":"^18.0.10","ethers":"^6.17.0","express":"^4.19.2","nodemailer":"^10.5.0","qrcode":"^1.5.4"},"devDependencies":{"@nomicfoundation/hardhat-toolbox":"^5.0.0","@types/node":"^26.6.6","hardhat":"^2.29.1","ts-node":"^10.9.2","typescript":"^7.0.2"}}
+{
+  "name": "avatix-dapp",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "chain": "npx hardhat node",
+    "test:contracts": "npx hardhat test",
+    "deploy:local": "npx hardhat run scripts/deploy.js --network localhost",
+    "deploy:fuji": "npx hardhat run scripts/deploy.js --network fuji",
+    "test:app": "node --test tests/backend.test.js tests/mailer.test.js"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.18.0",
+    "better-sqlite3": "^11.5.0",
+    "dotenv": "^18.0.10",
+    "ethers": "^6.17.0",
+    "express": "^4.19.2",
+    "heic-decode": "^2.1.0",
+    "nodemailer": "^10.5.0",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/node": "^26.6.6",
+    "hardhat": "^2.29.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^7.0.2"
+  }
+}

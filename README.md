@@ -6,10 +6,37 @@ npm install
 npm start      # http://localhost:3000
 ```
 Cơ sở dữ liệu SQLite (`avatix.db`) tự tạo và tự động migrate schema. Đổi `SECRET` trong `.env` khi triển khai.
+Khuyến nghị Node.js 22 LTS. Cài đúng phiên bản khóa bằng `npm ci` khi chuẩn bị kiểm thử hoặc triển khai.
 
 - `/login.html`: đăng nhập / đăng ký (tự tạo ví EVM xác định cho mỗi user)
 - `/customer.html`: khách hàng (mua vé, mở QR động 20s, bán lại giá trần +10%, xem NFT on-chain & lịch sử giao dịch)
 - `/organizer.html`: nhà cung cấp (tạo sự kiện, thống kê, soát vé tại cổng, xem lịch sử on-chain)
+
+## Menu và ảnh đại diện
+
+Mở nút menu ba sọc để vào Tài khoản, Vé của tôi, Chợ vé, Lịch sử on-chain hoặc Đăng xuất. Trong Tài khoản, chọn ảnh từ thiết bị, kéo ảnh để đổi vị trí và dùng thanh thu phóng để căn vào khung vuông trước khi lưu. Ảnh được lưu vào tài khoản trên cơ sở dữ liệu (cả SQLite và Turso), dùng lại sau khi đăng nhập.
+
+Trình duyệt xử lý các định dạng ảnh mà thiết bị hỗ trợ; máy chủ bổ sung chuyển đổi TIFF và HEIC/HEIF khi cần. Ảnh gốc tối đa 8 MiB, chuyển đổi máy chủ tối đa 40 megapixel. Ảnh động dùng khung hình đầu; dữ liệu lưu là WebP tĩnh 512×512 đã bỏ metadata. Một số định dạng RAW hoặc codec đặc biệt có thể không đọc được; giao diện sẽ hướng dẫn chọn ảnh khác thay vì lưu tệp lỗi.
+
+## Gửi OTP thật qua Gmail
+
+Mỗi người dùng nhận OTP tại **địa chỉ email đã đăng ký của chính họ**. `SMTP_USER` là tài khoản gửi thư của AVA-TIX, không thay thế email người nhận.
+
+1. Sao chép `.env.example` thành `.env`. Với Gmail gửi thư, bật [xác minh 2 bước và tạo App Password](https://support.google.com/mail/answer/185833). Không dùng mật khẩu đăng nhập Gmail thông thường.
+2. Cấu hình `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_SECURE=true`, `SMTP_USER` là Gmail gửi thư và `SMTP_PASS` là App Password. Có thể dùng cổng `587` với `SMTP_SECURE=false` để kết nối STARTTLS. Tham khảo [cấu hình SMTP của Google](https://developers.google.com/workspace/gmail/imap/imap-smtp).
+3. Khởi động lại máy chủ, đăng ký bằng địa chỉ email thật rồi chọn **Gửi mã OTP**. Kiểm tra Hộp thư đến và Spam. Máy chủ triển khai phải cho phép kết nối SMTP ra ngoài.
+
+Không cấu hình SMTP hoặc gửi thư lỗi sẽ báo lỗi rõ ràng; không có OTP mẫu hiện trên màn hình, trong phản hồi API hay nhật ký máy chủ. Mã chỉ dùng được sau khi máy chủ thư chấp nhận gửi, có hiệu lực 5 phút, tối đa 5 lần nhập sai, và chờ 30 giây giữa các lần gửi thành công. Các thao tác mua vé cũng cần OTP thật. Tài khoản demo dùng email mẫu, nên hãy dùng tài khoản đăng ký với email thật để nhận thư.
+
+Giữ `.env`, App Password và khóa ví ngoài Git. Nếu đã lộ App Password, thu hồi trong tài khoản Google rồi tạo lại.
+
+## Kiểm thử máy chủ
+
+```bash
+node --test tests/backend.test.js tests/mailer.test.js
+```
+
+Các kiểm thử dùng SQLite trong bộ nhớ và bộ gửi thư thay thế; không gửi email thật. Kiểm thử kiểm tra ảnh đại diện qua phiên đăng nhập, giới hạn upload, xác thực OTP, giới hạn nhập sai và hành vi khi gửi thư thất bại. Kiểm thử contract vẫn chạy riêng như bên dưới.
 
 ## Tích hợp Smart Contract (Hybrid Relayer)
 
