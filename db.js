@@ -48,6 +48,7 @@ if (useTurso) {
     async migrate() {
       await _migrate(db);
     },
+    _client: client,
     _isTurso: true,
   };
 
@@ -85,6 +86,7 @@ if (useTurso) {
     _rawAll(sql, args) {
       return sqliteDb.prepare(sql).all(...(args || []));
     },
+    _sqlite: sqliteDb,
     _isTurso: false,
   };
 
@@ -375,3 +377,47 @@ async function _migrate(db) {
     }
   }
 }
+
+// A write transaction covers validation AND mutations. ALS keeps nested calls on
+// the same connection; the gate prevents other requests seeing uncommitted SQLite data.
+const { AsyncLocalStorage } = require('node:async_hooks');
+const context = new AsyncLocalStorage();
+const database = module.exports;
+let tail = Promise.resolve();
+const exclusive = async fn => {
+  const previous = tail; let release;
+  tail = new Promise(resolve => { release = resolve; });
+  await previous;
+  try { return await fn(); } finally { release(); }
+};
+for (const method of ['get','all','run','batch']) {
+  const original = database[method].bind(database);
+  database[method] = async (...args) => {
+    const tx = context.getStore();
+    if (!tx) return exclusive(() => original(...args));
+    if (!database._isTurso) {
+      if (method === 'batch') { for (const stmt of args[0]) await database.run(stmt.sql, stmt.args); return; }
+      return original(...args);
+    }
+    if (method === 'batch') { for (const stmt of args[0]) await database.run(stmt.sql, stmt.args); return; }
+    const result = await tx.execute({sql:args[0],args:args[1] || []});
+    if (method === 'run') return {lastInsertRowid:Number(result.lastInsertRowid || 0),rowsAffected:result.rowsAffected};
+    const rows = result.rows.map(row => Object.fromEntries(result.columns.map((key,i)=>[key,row[i]])));
+    return method === 'get' ? rows[0] : rows;
+  };
+}
+database.transaction = async fn => {
+  if (context.getStore()) return fn();
+  return exclusive(async () => {
+    const tx = database._isTurso ? await database._client.transaction('write') : {};
+    if (!database._isTurso) database._sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const value = await context.run(tx, fn);
+      if (database._isTurso) await tx.commit(); else database._sqlite.exec('COMMIT');
+      return value;
+    } catch (error) {
+      if (database._isTurso) await tx.rollback(); else database._sqlite.exec('ROLLBACK');
+      throw error;
+    } finally { if (database._isTurso) tx.close(); }
+  });
+};

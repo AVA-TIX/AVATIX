@@ -1,3 +1,9 @@
+# TÀI LIỆU LỊCH SỬ — KHÔNG PHẢI CAM KẾT BẢN HIỆN TẠI
+
+Đọc README và /policies.html cho phạm vi đang chạy. ERC-721, ERC-4337, atomic settlement, ngăn ảnh chụp tuyệt đối và thời gian 0,8s bên dưới là ý tưởng chưa triển khai/kiểm chứng. Hạn nộp hiện tại theo cổng cuộc thi là 21/11/2026 23:59 giờ Việt Nam.
+
+---
+
 # AVA-TIX — NEXT-GEN EVENT TICKETING PROTOCOL ON AVALANCHE
 
 **Đề án Dự thi:** UniHack Avalanche 2026 (Team1 Vietnam)
