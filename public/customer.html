@@ -1,4 +1,4 @@
-<!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Mua vé sự kiện chính hãng Web3</title><link rel=icon type=image/svg+xml href=logo-icon.svg><link rel=apple-touch-icon href=icon.jpg><script src=theme.js></script><link rel=stylesheet href=style.css><link rel=stylesheet href=profile.css><link rel=stylesheet href=dark.css>
+<!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Mua vé sự kiện chính hãng Web3</title><link rel=icon type=image/svg+xml href=logo-icon.svg><link rel=apple-touch-icon href=icon.jpg><script src=theme.js></script><link rel=stylesheet href=style.css><link rel=stylesheet href=profile.css><link rel=stylesheet href=dark.css><link rel=stylesheet href=event-carousel.css>
 <body class=customer-page><header class=top id=top></header><main class=wrap><div class=page-heading><p class=eyebrow>Vé sự kiện trên Avalanche</p><h1 id=pageTitle>Khám phá sự kiện</h1><p id=pageIntro>Tìm một sự kiện bạn muốn có mặt.</p></div><div id=heroWrap></div><div class=tabs id=tabs></div><div class=search-box><input id=q placeholder="Tìm sự kiện hoặc địa điểm" aria-label="Tìm sự kiện hoặc địa điểm" oninput=draw()></div><div id=wrapList></div></main>
 <footer class=site-footer>
   <div class=footer-wrap>
@@ -27,7 +27,7 @@
   </div>
   <div class=footer-bottom>&copy; 2026 AVA-TIX · Dự án UniHack Avalanche 2026</div>
 </footer>
-<script src=security-ui.js></script><script src=app.js></script><script>
+<script src=security-ui.js></script><script src=app.js></script><script src=event-carousel.js></script><script>
 let tab='open',ev=[],tk=[],mk=[],hs=[],chainPollTimer=null;
 const T={open:'Sự kiện đang mở bán',mine:'Vé của tôi',market:'Chợ vé',history:'Lịch sử on-chain'};
 (async()=>{window.me=await init('customer');if(me)load()})();
@@ -40,36 +40,8 @@ async function load(){
 }
 const hit=o=>(o.name+' '+o.venue).toLowerCase().includes($('#q').value.trim().toLowerCase());
 
-function renderHero(list){
- const activeList=list.filter(e=>e.status!=='cancelled');
- if(tab!=='open'||!activeList.length)return'';
- const topEv=activeList[0],imgUrl=getEventImg(topEv),th=bannerTheme(topEv.name);
- const myTicketCount=tk.filter(t=>t.event===topEv.id&&t.used!=2).length;
- const isLimitReached=topEv.max_per_user>0&&myTicketCount>=topEv.max_per_user;
- return `<div class="hero-banner" style="background-image:linear-gradient(90deg, rgba(15,23,42,0.92) 0%, rgba(15,23,42,0.8) 55%, rgba(15,23,42,0.35) 100%), url('${esc(imgUrl)}')">
-  <div class="hero-content">
-   <div class="hero-tag"> SỰ KIỆN NỔI BẬT · ${th.tag}</div>
-   <h2 class="hero-title">${esc(topEv.name)}</h2>
-   <p class="hero-desc">${topEv.max_per_user>0?` (Quy định: Tối đa ${topEv.max_per_user} vé/tài khoản)`:''}</p>
-   <div class="hero-meta">
-    <div class="hero-meta-item"> <b>${dmy(topEv.date)}</b></div>
-    <div class="hero-meta-item"> <b>${esc(topEv.venue)}</b></div>
-    <div class="hero-meta-item"> <b>Giá từ ${vnd(topEv.price)}</b></div>
-    ${topEv.max_per_user>0?`<div class="hero-meta-item"> <b>Tối đa ${topEv.max_per_user} vé/TK</b></div>`:''}
-   </div>
-   <div class="hero-actions">
-    ${isLimitReached?`<button class="btn" disabled title="Bạn đã mua tối đa ${topEv.max_per_user} vé">Đã đạt giới hạn (${topEv.max_per_user} vé)</button>`:
-      `<button class="btn" ${topEv.remain>0?'':'disabled'} onclick="confirmBuy('buy',{event:${topEv.id}},${topEv.id},'open')">
-       ${topEv.remain>0?'Mua vé ngay':'Hết vé'}
-      </button>`}
-    <button class="btn ghost" onclick="viewDetail(${topEv.id},'open')">Chi tiết</button>
-   </div>
-  </div>
-  <div class="hero-poster-preview">
-   <img src="${esc(imgUrl)}" alt="${esc(topEv.name)}">
-  </div>
- </div>`;
-}
+let disposeCarousel=()=>{},heroMarkup=null;
+function renderHero(list){return tab==='open'?EventCarousel.render(EventCarousel.selectHot(list),esc,getEventImg):'';}
 
 window.navigateSection=function(section){if(!Object.hasOwn(T,section))return;tab=section;draw();window.scrollTo({top:0,behavior:'smooth'})};
 function draw(){
@@ -78,7 +50,13 @@ function draw(){
  $('#pageTitle').textContent=headings[tab][0];
  $('#pageIntro').textContent=headings[tab][1];
  const activeEv=ev.filter(e=>e.status!=='cancelled');
- $('#heroWrap').innerHTML=renderHero(activeEv);
+ const nextHero=renderHero(activeEv);
+ if(nextHero!==heroMarkup){
+  disposeCarousel();
+  $('#heroWrap').innerHTML=nextHero;
+  disposeCarousel=EventCarousel.mount($('#heroWrap'),id=>viewDetail(id,'open'));
+  heroMarkup=nextHero;
+ }
  $('#tabs').innerHTML=Object.entries(T).map(([k,v])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';draw()">${v}</button>`).join('');
  $('#q').parentElement.hidden=tab==='history';
  if(tab==='history'){$('#wrapList').innerHTML=renderHistory(hs);return}
