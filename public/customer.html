@@ -21,17 +21,23 @@
         <li><a href="#" onclick="openTermsModal();return false">Điều khoản &amp; Quy chế bán vé</a></li>
         <li><a href="#" onclick="openSecurityModal();return false">Xác thực Email &amp; Bảo mật OTP</a></li>
         <li><a href="#" onclick="showChainInfo();return false">Kiểm tra Smart Contract Explorer</a></li>
-        <li><a href="mailto:support@avatix.vn">Liên hệ: support@avatix.vn</a></li>
+        <li><a href="mailto:avatix.hcmus@gmail.com">Liên hệ: avatix.hcmus@gmail.com</a></li>
       </ul>
     </div>
   </div>
   <div class=footer-bottom>&copy; 2026 AVA-TIX · Dự án UniHack Avalanche 2026</div>
 </footer>
 <script src=security-ui.js></script><script src=app.js></script><script>
-let tab='open',ev=[],tk=[],mk=[],hs=[];
+let tab='open',ev=[],tk=[],mk=[],hs=[],chainPollTimer=null;
 const T={open:'Sự kiện đang mở bán',mine:'Vé của tôi',market:'Chợ vé',history:'Lịch sử on-chain'};
 (async()=>{window.me=await init('customer');if(me)load()})();
-async function load(){[ev,tk,mk,hs]=await Promise.all([api('events'),api('tickets'),api('market'),api('history')]);draw()}
+async function load(){
+ clearTimeout(chainPollTimer);
+ [ev,tk,mk,hs]=await Promise.all([api('events'),api('tickets'),api('market'),api('history')]);
+ draw();
+ const hasPendingChain=hs.some(x=>!x.tx_hash&&['queued','processing','submitted'].includes(x.chain_state));
+ if(hasPendingChain) chainPollTimer=setTimeout(load,3000);
+}
 const hit=o=>(o.name+' '+o.venue).toLowerCase().includes($('#q').value.trim().toLowerCase());
 
 function renderHero(list){
@@ -265,7 +271,7 @@ function confirmBuy(path,body,id,src){
    if(isDemoBypass){
     const res=await api(path,{...body});
     closeModal();
-    toast(res.txHash?`Mua vé thành công! (On-chain: ${shortHash(res.txHash)})`:'Mua vé thành công!');
+    toast(res.txHash?`Mua vé thành công! (On-chain: ${shortHash(res.txHash)})`:(window.me?.chain?.enabled?'Mua vé thành công! Đang ghi nhận NFT lên Avalanche Fuji...':'Mua vé thành công!'));
     window.me=await api('me');
     setBal(window.me);
     tab='mine';
@@ -326,7 +332,7 @@ function renderOtpStep(path,body,o,price,otpRes){
   try{
    const res=await api(path,{...body,code});
    closeModal();
-   toast(res.txHash?`Mua vé thành công! (On-chain: ${shortHash(res.txHash)})`:'Mua vé thành công!');
+   toast(res.txHash?`Mua vé thành công! (On-chain: ${shortHash(res.txHash)})`:(window.me?.chain?.enabled?'Mua vé thành công! Đang ghi nhận NFT lên Avalanche Fuji...':'Mua vé thành công!'));
    window.me=await api('me');
    setBal(window.me);
    tab='mine';
