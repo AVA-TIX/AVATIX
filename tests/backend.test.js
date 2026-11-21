@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 process.env.DB = ':memory:';
 process.env.SMTP_USER = '';
 process.env.SMTP_PASS = '';
+process.env.BREVO_API_KEY = '';
 process.env.TURSO_DATABASE_URL = '';
 process.env.TURSO_AUTH_TOKEN = '';
 const { app, db } = require('../server');
@@ -75,7 +76,7 @@ test('account avatar and email-only OTP API', async t => {
     });
     let otpUser;
     await t.test('missing SMTP never exposes a code or creates a usable OTP', async () => {
-      const registered = await request('register', { username: 'otp_tester', password: 'Testpass1', email: 'recipient@gmail.com', phone: '0901234567', bank: 'VCB - 1234567890', role: 'customer' });
+      const registered = await request('register', { username: 'otp_tester', password: 'Testpass1', pin: '034678', pinConfirmation: '034678', email: 'recipient@gmail.com', phone: '0901234567', bank: 'VCB - 1234567890', role: 'customer' });
       assert.equal(registered.status, 200);
       assert.match(registered.body.otpError, /chưa được cấu hình/);
       assertNoCode(registered.body);

@@ -2,8 +2,8 @@ const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>
 const dots=n=>String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,'.'),vnd=n=>dots(n)+'đ',dmy=d=>d.split('-').reverse().join('/'),num=v=>parseInt(String(v).replace(/\D/g,''))||0;
 const shortHash=h=>h?h.slice(0,8)+'…'+h.slice(-6):'';
 const money=i=>{const n=num(i.value);i.value=n?dots(n):''};
-async function api(u,b){
-  const r=await fetch('/api/'+u,b===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+async function api(u,b,headers={}){
+  const r=await fetch('/api/'+u,b===undefined?{headers}:{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(b)});
   const d=await r.json().catch(()=>({}));
   if(!r.ok){
     if(r.status===401 && !location.pathname.endsWith('login.html')){
@@ -21,8 +21,10 @@ function openModal(h){
   $('#m').innerHTML='<div class="mb" role="dialog" aria-modal="true" aria-label="'+(h.match(/<h2[^>]*>([^<]+)/)?.[1]||'AVA-TIX')+'" tabindex="-1">'+h+'</div>';
   $('#m').hidden=false;
   $('#m .mb').focus();
+  mountPasswordEyes($('#m'));
 }
 function closeModal(){
+  if($('#m .mb')?.dataset.required==='true')return;
   if(modalCleanup){modalCleanup();modalCleanup=null}
   $('#m').hidden=true;$('#m').innerHTML='';clearInterval(window.tm);
   if(modalReturnFocus?.isConnected)modalReturnFocus.focus();
@@ -67,6 +69,7 @@ function closeTermsModal(){
   if(tm) tm.hidden = true;
 }
 document.addEventListener('keydown', e => {
+  if($('.pin-layer'))return;
   if(e.key === 'Escape'){
     const tm = $('#termsModal');
     if(tm && !tm.hidden) closeTermsModal();
@@ -101,7 +104,11 @@ function showChainInfo(){
     <p class=note>Mô hình Relayer: mọi giao dịch mua vé, bán lại và check-in được ghi nhận lên smart contract mà bạn không cần trả phí gas.</p>
     <div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button></div>`);
 }
-function qr(id){
+async function qr(id){
+  if(!window.me.pinConfigured){openPinSettings(true);return}
+  const unlocked=await askPin({title:'Mở mã QR của vé',description:'Nhập mã bảo mật 6 số của bạn để xem vé. Mã QR sẽ được khóa lại khi bạn đóng cửa sổ.',verify:pin=>api('qr/'+id+'/unlock',{pin})});
+  if(!unlocked)return;
+  const unlockToken=unlocked.unlockToken;
   openModal(`<h2>Mã QR vào cổng</h2>
     <div class=qrbox id=qb><div style="padding:22px;color:var(--text-muted)"> Đang tạo mã QR động...</div></div>
     <p class="note" id=cd style="text-align:center"></p>
@@ -112,9 +119,10 @@ function qr(id){
   if(cp) cp.onclick = () => { navigator.clipboard?.writeText($('#qt')?.value || ''); toast('Đã copy mã QR!'); };
 
   const g = async () => {
+    const target=$('#qb');if(!target)return;
     try {
-      const r = await api('qr/' + id);
-      const qb = $('#qb'); if(!qb) return;
+      const r = await api('qr/' + id,undefined,{'X-Ticket-Unlock':unlockToken});
+      const qb = $('#qb'); if(qb!==target) return;
       qb.innerHTML = r.svg;
       if($('#qt')) $('#qt').value = r.token;
       let s = r.left;
@@ -125,15 +133,18 @@ function qr(id){
         if(--s < 0) g();
       }, 1000);
     } catch(e) {
+      if($('#qb')!==target)return;
       const qb = $('#qb');
       if(qb) {
         qb.innerHTML = `<div style="padding:22px 14px;text-align:center">
           <div style="font-size:36px;margin-bottom:8px"></div>
-          <div style="font-weight:700;color:#dc2626;font-size:15px;margin-bottom:6px">Không thể tạo mã QR</div>
+          <div style="font-weight:700;color:#f3a0a7;font-size:15px;margin-bottom:6px">Không thể tạo mã QR</div>
           <div class="note" style="color:var(--text);font-size:13.5px">${esc(e.message)}</div>
         </div>`;
       }
       if($('#cd')) $('#cd').textContent = '';
+      clearInterval(window.tm);
+      if(e.st===403){$('#qb').innerHTML='<p class=note>Vé đã được khóa lại để bảo vệ tài khoản.</p><button class=btn id=reopenQr>Mở khóa lại</button>';$('#reopenQr').onclick=()=>qr(id)}
       toast(e.message, 1);
     }
   };
@@ -148,7 +159,7 @@ function renderHistory(rows){
     <tbody>${rows.map(tx=>`<tr>
       <td>${esc(tx.at)}</td>
       <td><span class=badge>${esc(labels[tx.type]||tx.type)}</span></td>
-      <td><b style="color:${tx.amount>0?'#059669':tx.amount<0?'#dc2626':'inherit'}">${tx.amount>0?'+'+vnd(tx.amount):tx.amount<0?'-'+vnd(Math.abs(tx.amount)):'—'}</b></td>
+      <td><b style="color:${tx.amount>0?'#8fd5b0':tx.amount<0?'#f3a0a7':'inherit'}">${tx.amount>0?'+'+vnd(tx.amount):tx.amount<0?'-'+vnd(Math.abs(tx.amount)):'—'}</b></td>
       <td>${esc(tx.note)}</td>
       <td>${txHtml(tx.tx_hash,tx.explorerUrl)}</td>
     </tr>`).join('')}</tbody>
@@ -157,7 +168,7 @@ function renderHistory(rows){
   const mobileCards = `<div class="hist-mobile">${rows.map(tx=>{
     const isPlus = tx.amount > 0;
     const isMinus = tx.amount < 0;
-    const amtColor = isPlus ? '#059669' : isMinus ? '#dc2626' : 'var(--text-muted)';
+    const amtColor = isPlus ? '#8fd5b0' : isMinus ? '#f3a0a7' : 'var(--text-muted)';
     const amtText = isPlus ? '+'+vnd(tx.amount) : isMinus ? '-'+vnd(Math.abs(tx.amount)) : '—';
     return `<div class="hist-card">
       <div class="hist-card-head">
@@ -220,103 +231,15 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Home'){e.preventDefault();links[0].focus()}
   if(e.key==='End'){e.preventDefault();links.at(-1).focus()}
 });
-function openSecurityModal(){
-  const me=window.me||{};
-  const role=me.role;
-  const devName = me.currentDevice === 'mobile' ? ' Điện thoại di động' : ' Máy tính (PC / Laptop)';
-  const activeSess = me.activeSessions || {};
-  const activeList = [
-    activeSess.desktop ? ' 1 Máy tính' : null,
-    activeSess.mobile  ? ' 1 Điện thoại' : null
-  ].filter(Boolean).join(' + ') || '1 thiết bị';
-
-  openModal(`<h2>Tài khoản</h2>
-    <div class="profile-summary">${avatarHtml(me,'profile-avatar')}<div><b>${esc(me.username)}</b><p class="note">Ảnh đại diện của bạn trên AVA-TIX</p><button class="btn ghost sm" onclick="openAvatarEditor()">Thay ảnh đại diện</button></div></div>
-    <table class=info>
-      <tr><th>Tên đăng nhập</th><td><b>${esc(me.username)}</b></td></tr>
-      <tr><th>Email</th><td>${esc(me.email)} ${me.emailVerified?'<span class="badge nft">Đã xác thực</span>':'<span class="badge out">Chưa xác thực</span>'}</td></tr>
-      <tr><th>Thiết bị này</th><td><b>${devName}</b></td></tr>
-      <tr><th>Bảo vệ phiên</th><td><span class="badge ok">1 PC + 1 Mobile song song</span></td></tr>
-      <tr><th>Phiên đang mở</th><td><span style="font-weight:600;color:var(--tb-green)">${esc(activeList)}</span></td></tr>
-    </table>
-    <p class="note" style="margin:10px 0 14px;background:rgba(0,177,79,0.06);padding:10px 14px;border-radius:10px;border:1px solid rgba(0,177,79,0.2)">
-       <b>Cơ chế chống gian lận &amp; chia sẻ tài khoản:</b> Hệ thống cho phép duy nhất <b>1 phiên PC</b> và <b>1 phiên Điện thoại</b> cùng lúc. Nếu có thiết bị thứ 2 cùng loại đăng nhập, thiết bị cũ sẽ tự động đăng xuất ngay lập tức để bảo vệ vé của bạn.
-    </p>
-    ${me.emailVerified?'':`
-      <div class=sec-box>
-        <h3>1. Xác thực Email</h3>
-        <p class=note>Cần xác thực email trước khi đổi mật khẩu hoặc khôi phục tài khoản.</p>
-        <div id=evBox></div>
-        <div class=row>
-          <button class="btn sm" id=evSend>Gửi mã OTP</button>
-          <input id=evCode inputmode=numeric maxlength=6 placeholder="Nhập OTP 6 số" style="flex:1">
-          <button class="btn sm" id=evOk>Xác nhận</button>
-        </div>
-      </div>`}
-    <div class=sec-box>
-      <h3>${me.emailVerified?'Đổi mật khẩu':'2. Đổi mật khẩu'}</h3>
-      ${me.emailVerified?`
-        <p class=note>Bắt buộc xác thực cả <b>Mật khẩu hiện tại</b> và <b>Mã OTP gửi về Email</b>.</p>
-        <label>Mật khẩu hiện tại</label><input id=cpOld type=password autocomplete=current-password>
-        <div id=cpBox></div>
-        <div class=row style="margin-top:10px">
-          <button class="btn sm ghost" id=cpSend>Gửi OTP xác nhận</button>
-          <input id=cpCode inputmode=numeric maxlength=6 placeholder="Mã OTP 6 số" style="flex:1">
-        </div>
-        <label>Mật khẩu mới (≥ 8 ký tự, 1 chữ hoa, 1 số)</label><input id=cpNew type=password autocomplete=new-password>
-        <label>Xác nhận mật khẩu mới</label><input id=cpNew2 type=password autocomplete=new-password>
-        <div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button><button class=btn id=cpOk>Đổi mật khẩu</button></div>
-      `:`
-        <p class=note err> Vui lòng xác thực Email ở trên trước khi đổi mật khẩu.</p>
-        <div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button></div>
-      `}
-    </div>`);
-
-  if(!me.emailVerified){
-    $('#evSend').onclick=async()=>{
-      try{
-        const r=await api('verify-email/request',{});
-        $('#evBox').innerHTML=`<p class="note good">Đã gửi OTP tới ${esc(r.maskedEmail)}. Kiểm tra cả mục thư rác.</p>`;
-        toast('Đã gửi mã OTP xác thực email');
-      }catch(e){toast(e.message,1)}
-    };
-    $('#evOk').onclick=async()=>{
-      try{
-        await api('verify-email/confirm',{code:$('#evCode').value.trim()});
-        toast('Xác thực Email thành công!');
-        window.me=await api('me');
-        renderTop(window.me,role);
-        if(typeof load==='function')load();
-        openSecurityModal();
-      }catch(e){toast(e.message,1)}
-    };
-  }else{
-    $('#cpSend').onclick=async()=>{
-      try{
-        const r=await api('change-password/request',{currentPassword:$('#cpOld').value});
-        $('#cpBox').innerHTML=`<p class="note good">Đã gửi OTP tới ${esc(r.maskedEmail)}. Mã có hiệu lực 5 phút.</p>`;
-        toast('Đã gửi OTP xác nhận đổi mật khẩu');
-      }catch(e){toast(e.message,1)}
-    };
-    $('#cpOk').onclick=async()=>{
-      const np=$('#cpNew').value,np2=$('#cpNew2').value;
-      if(np!==np2)return toast('Mật khẩu xác nhận không khớp',1);
-      try{
-        await api('change-password/confirm',{currentPassword:$('#cpOld').value,newPassword:np,code:$('#cpCode').value.trim()});
-        closeModal();
-        toast('Đổi mật khẩu thành công!');
-        if(typeof load==='function')load();
-      }catch(e){toast(e.message,1)}
-    };
-  }
-}
 async function init(role){
   document.body.insertAdjacentHTML('beforeend','<div id=m hidden></div>');
   $('#m').onclick=e=>{if(e.target.id==='m')closeModal()};
   try{
     const me=await api('me');
     if(me.role!==role){location='/'+me.role+'.html';return}
-    renderTop(me,role);return me;
+    window.me=me;renderTop(me,role);
+    if(!me.pinConfigured)openPinSettings(true);
+    return me;
   }catch{location='/login.html'}
 }
 const setBal=m=>$('#bal').textContent=vnd(m.balance);

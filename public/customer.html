@@ -1,4 +1,4 @@
-<!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Mua vé sự kiện chính hãng Web3</title><link rel=stylesheet href=style.css><link rel=stylesheet href=profile.css>
+<!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Mua vé sự kiện chính hãng Web3</title><link rel=stylesheet href=style.css><link rel=stylesheet href=profile.css><link rel=stylesheet href=dark.css>
 <body class=customer-page><header class=top id=top></header><main class=wrap><div class=page-heading><p class=eyebrow>Vé sự kiện trên Avalanche</p><h1 id=pageTitle>Khám phá sự kiện</h1><p id=pageIntro>Tìm một sự kiện bạn muốn có mặt.</p></div><div id=heroWrap></div><div class=tabs id=tabs></div><div class=search-box><input id=q placeholder="Tìm sự kiện hoặc địa điểm" aria-label="Tìm sự kiện hoặc địa điểm" oninput=draw()></div><div id=wrapList></div></main>
 <footer class=site-footer>
   <div class=footer-wrap>
@@ -27,7 +27,7 @@
   </div>
   <div class=footer-bottom>&copy; 2026 AVA-TIX · Dự án UniHack Avalanche 2026</div>
 </footer>
-<script src=app.js></script><script>
+<script src=security-ui.js></script><script src=app.js></script><script>
 let tab='open',ev=[],tk=[],mk=[],hs=[];
 const T={open:'Sự kiện đang mở bán',mine:'Vé của tôi',market:'Chợ vé',history:'Lịch sử on-chain'};
 (async()=>{window.me=await init('customer');if(me)load()})();
