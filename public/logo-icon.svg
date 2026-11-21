@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 44" fill="none">
+  <defs>
+    <mask id="ticket-notch">
+      <rect width="64" height="44" rx="5" fill="#ffffff"/>
+      <circle cx="0" cy="22" r="5.5" fill="#000000"/>
+      <circle cx="64" cy="22" r="5.5" fill="#000000"/>
+    </mask>
+  </defs>
+  <rect x="0.75" y="0.75" width="62.5" height="42.5" rx="4.5" fill="#0F172A" stroke="#334155" stroke-width="1.5" mask="url(#ticket-notch)"/>
+  <!-- Main Avalanche A Peak -->
+  <polygon points="12,35 27,10 42,35 34.5,35 27,22.5 19.5,35" fill="#E84142"/>
+  <!-- Secondary Peak -->
+  <polygon points="29.5,35 37.5,21.5 45.5,35" fill="#E84142"/>
+  <polygon points="32,35 37.5,25.6 43,35" fill="#FFFFFF"/>
+  <!-- Node / QR Motif -->
+  <line x1="47.5" y1="11.5" x2="53.5" y2="11.5" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round"/>
+  <line x1="47.5" y1="11.5" x2="47.5" y2="17.5" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round"/>
+  <circle cx="47.5" cy="11.5" r="2" fill="#FFFFFF"/>
+  <circle cx="47.5" cy="17.5" r="2" fill="#FFFFFF"/>
+  <circle cx="53.5" cy="11.5" r="2" fill="#E84142"/>
+  <circle cx="53.5" cy="17.5" r="2" fill="#E84142"/>
+</svg>

@@ -195,7 +195,7 @@ function renderTop(me,role){
   const caption=role==='customer'?'Vé cho những cuộc hẹn hay.':role==='organizer'?'Dành cho nhà tổ chức':'Quản trị hệ thống';
   const roleName=role==='customer'?'Khách hàng':role==='organizer'?'Nhà tổ chức':'Quản trị viên (Admin)';
   $('#top').innerHTML=`
-    <div class="top-brand"><a class="logo" href="/${role}.html" aria-label="AVA-TIX — Trang chủ"><span>AVA</span>-TIX</a><span class="brand-caption">${caption}</span><button type="button" class="chain-pill ${c.enabled?'on':'off'}" onclick="showChainInfo()" title="Xem trạng thái Smart Contract Avalanche">${pill}</button></div>
+    <div class="top-brand"><a class="logo" href="/${role}.html" aria-label="AVA-TIX — Trang chủ"><img class="brand-logo-icon" src="logo-icon.svg" alt="" width="34" height="24"><span>AVA</span>-TIX</a><span class="brand-caption">${caption}</span><button type="button" class="chain-pill ${c.enabled?'on':'off'}" onclick="showChainInfo()" title="Xem trạng thái Smart Contract Avalanche">${pill}</button></div>
     ${role==='admin'?'':`<div class="top-wallet"><span class="bal"><span class="bal-label">Số dư:</span> <b id="bal"></b></span><button class="btn sm btn-topup" onclick="topup()">Nạp tiền</button></div>`}
     <button class="account-shortcut" onclick="openSecurityModal()" aria-label="Tài khoản của ${esc(me.username)}">${avatarHtml(me)}<span>${esc(me.username)}</span></button>
     <div class="site-nav"><button class="menu-toggle" id="menuToggle" type="button" aria-label="Mở menu" aria-expanded="false" aria-controls="accountMenu" onclick="toggleNavigation()"><span class="hamburger" aria-hidden="true"><i></i><i></i><i></i></span><span>Menu</span></button>

@@ -1,4 +1,10 @@
+<p align="center">
+  <img src="public/logo.jpg" alt="AVA-TIX Logo" width="380" />
+</p>
+
 # AVA-TIX dApp v2 (UniHack Avalanche 2026)
+
+Bộ nhận diện thương hiệu nằm trong `public/`: [logo nền sáng](public/logo.jpg), [logo nền tối](public/logo-dark.jpg), [icon vuông](public/icon.jpg) và [vector favicon](public/logo-icon.svg).
 
 ## Chạy ứng dụng (Off-chain / Fallback)
 ```bash
@@ -10,7 +16,8 @@ Khuyến nghị Node.js 22 LTS. Cài đúng phiên bản khóa bằng `npm ci` k
 
 - `/login.html`: đăng nhập / đăng ký (tự tạo ví EVM xác định cho mỗi user)
 - `/customer.html`: khách hàng (mua vé, mở QR động 20s, bán lại giá trần +10%, xem NFT on-chain & lịch sử giao dịch)
-- `/organizer.html`: nhà cung cấp (tạo sự kiện, thống kê, soát vé tại cổng, xem lịch sử on-chain)
+- `/organizer.html`: nhà cung cấp (tạo sự kiện, biểu đồ doanh thu theo ngày, soát vé tại cổng, xem lịch sử on-chain)
+- `/admin.html`: quản trị viên (tổng quan phí sàn 5% & gas ví Relayer, duyệt/khóa BTC & user với thông tin nhạy cảm đã che, kiểm duyệt hủy/hoàn tiền show vi phạm)
 
 ## Mã bảo mật 6 số và giao diện
 
