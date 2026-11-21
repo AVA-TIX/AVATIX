@@ -427,7 +427,7 @@ route('post', 'topup', true, async r => {
 });
 
 // ─── Events ───────────────────────────────────────────────────────────────────
-const evSql = "SELECT e.*,u.username org FROM events e JOIN users u ON u.id=e.org WHERE (e.status != 'cancelled' OR e.status IS NULL)";
+const evSql = "SELECT e.*,u.username org,(SELECT COUNT(*) FROM tickets t WHERE t.event=e.id AND t.used!=2) AS sold FROM events e JOIN users u ON u.id=e.org WHERE (e.status != 'cancelled' OR e.status IS NULL)";
 route('get', 'events', true, () => db.all(evSql + ' ORDER BY e.date'));
 route('post', 'events', 'organizer', async r => {
   if (r.u.status !== 'active') throw E('Tài khoản Ban tổ chức đang chờ Admin duyệt CCCD nên chưa thể mở bán sự kiện', 403);
