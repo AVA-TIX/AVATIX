@@ -1155,7 +1155,7 @@ body.auth {
     font-size: 12.5px;
   }
   .bal-label {
-    display: none; /* Drop redundant 'Ví:' label */
+    display: inline;
   }
   .btn-topup {
     padding: 4px 9px;

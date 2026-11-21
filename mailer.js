@@ -62,6 +62,11 @@ function getTransporter() {
 }
 
 const PURPOSE_META = {
+  reset_pin: {
+    subject: '[AVA-TIX] Khôi phục mã bảo mật 6 số',
+    title: 'Khôi phục mã bảo mật',
+    desc: 'Bạn vừa yêu cầu tạo lại mã bảo mật AVA-TIX. Nhập OTP này để xác nhận. Không chia sẻ mã cho người khác.',
+  },
   verify_email: {
     subject: "[AVA-TIX] Mã xác thực Email tài khoản",
     title: "Xác thực địa chỉ Email",

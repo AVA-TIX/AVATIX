@@ -9,7 +9,9 @@ const { normalizeAvatar, prepareAvatar } = require('./avatar');
 
 const app = express();
 app.use(express.json({ limit: '12mb' }));
+app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 const SECRET = process.env.SECRET || 'avatix-dev-secret-doi-khi-deploy';
+const pinSecurity = require('./pin-security')(db, SECRET);
 const FEE = 0.05, CAP = 1.1, METHODS = ['momo', 'bank', 'vnpay', 'vietqr'];
 
 const E = (m, c = 400) => Object.assign(new Error(m), { c }),
@@ -45,7 +47,7 @@ const auth = role => async (r, s, n) => {
 
       // Kiểm tra phiên đơn nhất theo loại thiết bị (Single Session per Device Type)
       const currentSid = dev === 'mobile' ? u.session_mobile : u.session_desktop;
-      if (currentSid && currentSid !== sid) {
+      if (currentSid !== sid) {
         const devName = dev === 'mobile' ? 'điện thoại' : 'máy tính (PC/Laptop)';
         throw E(`Tài khoản đã đăng nhập trên một ${devName} khác. Phiên này đã tự động đăng xuất để bảo vệ an toàn cho vé.`, 401);
       }
@@ -104,7 +106,7 @@ const currentUserOpt = async r => {
       const u = await db.get('SELECT * FROM users WHERE id=?', [id]);
       if (!u) return null;
       const currentSid = dev === 'mobile' ? u.session_mobile : u.session_desktop;
-      if (currentSid && currentSid !== sid) return null;
+      if (currentSid !== sid) return null;
       return u;
     } else if (parts.length === 3) {
       const [id, exp, sg] = parts;
@@ -185,6 +187,7 @@ async function verifyOtp(userId, purpose, rawCode) {
 
 // ─── Auth routes ─────────────────────────────────────────────────────────────
 route('post', 'register', 0, async r => {
+  const pin = pinSecurity.credentials(r.body.pin, r.body.pinConfirmation);
   const { username: u, password: p, email, phone, bank, role, cccd } = r.body;
   if (!/^.{8,}$/.test(u || '')) throw E('Tên đăng nhập tối thiểu 8 ký tự');
   if (!PASS_RE.test(p || '')) throw E('Mật khẩu tối thiểu 8 ký tự, gồm 1 chữ in hoa và 1 chữ số');
@@ -201,7 +204,7 @@ route('post', 'register', 0, async r => {
   );
   const userId = Number(info.lastInsertRowid);
   const wallet = chain.getWalletAddress(userId);
-  await db.run('UPDATE users SET wallet=? WHERE id=?', [wallet, userId]);
+  await db.run('UPDATE users SET wallet=?,pin_hash=?,pin_salt=? WHERE id=?', [wallet, pin.hash, pin.salt, userId]);
   const newUser = await db.get('SELECT * FROM users WHERE id=?', [userId]);
   let otpInfo = {};
   try { otpInfo = await issueOtp(newUser, 'verify_email'); } catch (e) { otpInfo = { otpError: e.message }; }
@@ -227,7 +230,7 @@ route('post', 'verify-email/confirm', 0, async r => {
 route('post', 'change-password/request', true, async r => {
   if (!r.u.email_verified) throw E('Vui lòng xác thực Email trước khi đổi mật khẩu');
   const cur = String(r.body.currentPassword || '');
-  if (!cur || hash(cur, r.u.salt) !== r.u.hash) throw E('Mật khẩu hiện tại không đúng', 401);
+  if (!cur || hash(cur, r.u.salt) !== r.u.hash) throw E('Mật khẩu hiện tại không đúng', 422);
   const res = await issueOtp(r.u, 'change_password');
   return { ok: 1, ...res };
 });
@@ -235,7 +238,7 @@ route('post', 'change-password/request', true, async r => {
 route('post', 'change-password/confirm', true, async r => {
   if (!r.u.email_verified) throw E('Vui lòng xác thực Email trước khi đổi mật khẩu');
   const { currentPassword, newPassword, code } = r.body;
-  if (!currentPassword || hash(currentPassword, r.u.salt) !== r.u.hash) throw E('Mật khẩu hiện tại không đúng', 401);
+  if (!currentPassword || hash(currentPassword, r.u.salt) !== r.u.hash) throw E('Mật khẩu hiện tại không đúng', 422);
   if (!PASS_RE.test(newPassword || '')) throw E('Mật khẩu mới tối thiểu 8 ký tự, gồm 1 chữ in hoa và 1 chữ số');
   if (newPassword === currentPassword) throw E('Mật khẩu mới phải khác mật khẩu hiện tại');
   await verifyOtp(r.u.id, 'change_password', code);
@@ -257,7 +260,7 @@ route('post', 'forgot-password/confirm', 0, async r => {
   if (!PASS_RE.test(newPassword || '')) throw E('Mật khẩu mới tối thiểu 8 ký tự, gồm 1 chữ in hoa và 1 chữ số');
   await verifyOtp(u.id, 'reset_password', code);
   const salt = crypto.randomBytes(16).toString('hex');
-  await db.run('UPDATE users SET hash=?,salt=?,email_verified=1 WHERE id=?', [hash(newPassword, salt), salt, u.id]);
+  await db.run('UPDATE users SET hash=?,salt=?,email_verified=1,session_desktop=NULL,session_mobile=NULL WHERE id=?', [hash(newPassword, salt), salt, u.id]);
   await log(u.id, 'security', 0, 'Khôi phục mật khẩu qua OTP Email');
   return { ok: 1 };
 });
@@ -265,6 +268,10 @@ route('post', 'forgot-password/confirm', 0, async r => {
 route('post', 'login', 0, async (r, s) => {
   const u = await db.get('SELECT * FROM users WHERE username=?', [r.body.username || '']);
   if (!u || hash(r.body.password || '', u.salt) !== u.hash) throw E('Sai tên đăng nhập hoặc mật khẩu', 401);
+  if (u.pin_hash) {
+    if (!r.body.pin) return { pinRequired: true };
+    await pinSecurity.verify(u.id, r.body.pin);
+  }
 
   const dev = getDeviceType(r); // 'mobile' | 'desktop'
   const sid = crypto.randomBytes(16).toString('hex');
@@ -302,10 +309,11 @@ route('post', 'logout', 0, async (r, s) => {
 });
 
 route('get', 'me', true, async r => {
-  const { hash: _h, salt: _s, cccd: _c, ...u } = r.u;
+  const { hash: _h, salt: _s, cccd: _c, pin_hash: _ph, pin_salt: _ps, pin_attempts: _pa, pin_locked_until: _pl, session_desktop: _sd, session_mobile: _sm, ...u } = r.u;
   const currentDev = r.sessionDev || getDeviceType(r);
   return {
     ...u,
+    pinConfigured: Boolean(r.u.pin_hash),
     emailVerified: Boolean(r.u.email_verified),
     smtpEnabled: mailer.isSmtpConfigured(),
     demoOtpBypass: isDemoOtpBypass(r.u),
@@ -313,12 +321,56 @@ route('get', 'me', true, async r => {
     chain: chain.getStatus(),
     currentDevice: currentDev,
     activeSessions: {
-      desktop: Boolean(u.session_desktop),
-      mobile: Boolean(u.session_mobile)
+      desktop: Boolean(r.u.session_desktop),
+      mobile: Boolean(r.u.session_mobile)
     }
   };
 });
 route('get', 'chain', 0, () => chain.getStatus());
+
+route('post', 'security/pin/setup', true, async r => {
+  if (r.u.pin_hash) throw E('Tài khoản đã có mã bảo mật. Hãy dùng chức năng đổi mã.', 409);
+  if (hash(String(r.body.currentPassword || ''), r.u.salt) !== r.u.hash) throw E('Mật khẩu hiện tại không đúng', 422);
+  const pin = pinSecurity.credentials(r.body.pin, r.body.pinConfirmation);
+  const updated = await db.run('UPDATE users SET pin_hash=?,pin_salt=?,pin_attempts=0,pin_locked_until=0 WHERE id=? AND pin_hash IS NULL', [pin.hash, pin.salt, r.u.id]);
+  if (Number(updated.rowsAffected) !== 1) throw E('Mã bảo mật đã được tạo. Vui lòng tải lại trang.', 409);
+  return { ok: 1 };
+});
+route('post', 'security/pin/verify', 0, async r => {
+  const user = await currentUserOpt(r) || await resolveResetUser(r.body.identifier || r.body.username);
+  if (!user) throw E('Tên tài khoản hoặc mã bảo mật không đúng.', 422);
+  await pinSecurity.verify(user.id, r.body.pin);
+  return { ok: 1 };
+});
+route('post', 'security/pin/change', true, async r => {
+  if (hash(String(r.body.currentPassword || ''), r.u.salt) !== r.u.hash) throw E('Mật khẩu hiện tại không đúng', 422);
+  const pin = pinSecurity.credentials(r.body.pin, r.body.pinConfirmation);
+  await pinSecurity.verify(r.u.id, r.body.oldPin);
+  const updated = await db.run('UPDATE users SET pin_hash=?,pin_salt=?,pin_attempts=0,pin_locked_until=0 WHERE id=? AND pin_hash=?', [pin.hash, pin.salt, r.u.id, r.u.pin_hash]);
+  if (Number(updated.rowsAffected) !== 1) throw E('Thông tin bảo mật đã thay đổi. Vui lòng thử lại.', 409);
+  return { ok: 1 };
+});
+route('post', 'security/pin/reset/request', 0, async r => {
+  const u = await currentUserOpt(r) || await resolveResetUser(r.body.identifier);
+  if (!u.email_verified) throw E('Cần xác thực email trước khi khôi phục mã bảo mật.');
+  if (hash(String(r.body.currentPassword || ''), u.salt) !== u.hash) throw E('Mật khẩu hiện tại không đúng', 422);
+  return { ok: 1, ...await issueOtp(u, 'reset_pin') };
+});
+route('post', 'security/pin/reset/confirm', 0, async r => {
+  const u = await currentUserOpt(r) || await resolveResetUser(r.body.identifier);
+  if (!u.email_verified) throw E('Cần xác thực email trước khi khôi phục mã bảo mật.');
+  if (hash(String(r.body.currentPassword || ''), u.salt) !== u.hash) throw E('Mật khẩu hiện tại không đúng', 422);
+  const pin = pinSecurity.credentials(r.body.pin, r.body.pinConfirmation);
+  await verifyOtp(u.id, 'reset_pin', r.body.code);
+  await db.run('UPDATE users SET pin_hash=?,pin_salt=?,pin_attempts=0,pin_locked_until=0 WHERE id=?', [pin.hash, pin.salt, u.id]);
+  return { ok: 1 };
+});
+route('post', 'qr/:id/unlock', 'customer', async r => {
+  const ticket = await db.get('SELECT id FROM tickets WHERE id=? AND owner=?', [r.params.id, r.u.id]);
+  if (!ticket) throw E('Không tìm thấy vé của bạn.', 404);
+  await pinSecurity.verify(r.u.id, r.body.pin);
+  return { unlockToken: pinSecurity.ticketGrant(r.u, ticket.id, cookies(r).t || '') };
+});
 
 route('post', 'profile/avatar', true, async r => {
   const avatar = await normalizeAvatar(r.body.avatar);
@@ -585,6 +637,7 @@ const W = () => Math.floor(Date.now() / (STEP * 1000)),
   tok = (t, w) => `AVATIX|${t.id}|${t.owner}|${w}|${sign(`${t.id}|${t.owner}|${w}`)}`;
 
 route('get', 'qr/:id', 'customer', async r => {
+  pinSecurity.checkTicketGrant(r.get('X-Ticket-Unlock'), r.u, r.params.id, cookies(r).t || '');
   const t = await db.get('SELECT * FROM tickets WHERE id=? AND owner=?', [+r.params.id, r.u.id]);
   if (!t) throw E('Bạn không sở hữu vé này');
   if (t.used === 2) throw E('Sự kiện đã bị hủy và tiền vé đã được hoàn trả');

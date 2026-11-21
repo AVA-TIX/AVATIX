@@ -12,7 +12,18 @@ Khuyến nghị Node.js 22 LTS. Cài đúng phiên bản khóa bằng `npm ci` k
 - `/customer.html`: khách hàng (mua vé, mở QR động 20s, bán lại giá trần +10%, xem NFT on-chain & lịch sử giao dịch)
 - `/organizer.html`: nhà cung cấp (tạo sự kiện, thống kê, soát vé tại cổng, xem lịch sử on-chain)
 
-## Menu và ảnh đại diện
+## Mã bảo mật 6 số và giao diện
+
+- Người đăng ký mới tự chọn và xác nhận mã bảo mật 6 chữ số. Tài khoản cũ được yêu cầu tạo mã sau lần đăng nhập tiếp theo; không có mã mặc định hoặc mã chung cho tài khoản demo.
+- Với tài khoản đã tạo mã, đăng nhập cần cả mật khẩu và mã bảo mật. Mã được băm bằng scrypt với salt riêng và HMAC dùng `SECRET`; giữ `SECRET` ổn định khi khởi động lại hay triển khai lại.
+- Nút con mắt chỉ hiển thị **mật khẩu đang nhập** sau khi xác nhận mã bảo mật, rồi tự che lại sau 15 giây, khi sửa nội dung hoặc chuyển khỏi trang. Không lưu hay cung cấp lại mật khẩu gốc từ cơ sở dữ liệu. Trong form đăng ký chưa gửi, nút con mắt đối chiếu mã vừa chọn trên thiết bị.
+- Mỗi lần mở QR vé đều cần mã bảo mật. Máy chủ kiểm tra quyền mở theo tài khoản, phiên đăng nhập và từng vé, có hiệu lực 2 phút để QR tự đổi sau mỗi 20 giây; hết thời gian phải mở khóa lại. Đổi/khôi phục mã bảo mật vô hiệu hóa quyền mở QR trước đó.
+- Nhập sai mã 5 lần sẽ khóa trong 5 phút; giới hạn lưu trong cơ sở dữ liệu và dùng chung giữa các phiên. Khôi phục mã bằng mật khẩu tài khoản và OTP thật gửi về email đã xác thực, kể cả khi chưa đăng nhập.
+- Mục Tài khoản có nút **Đổi mật khẩu** riêng. Chọn **Menu → Giao diện → Sáng / Tối** để đổi màu toàn trang, kể cả trước khi đăng nhập. Lựa chọn được nhớ trên trình duyệt và áp dụng khi tải lại hoặc chuyển trang. Loại tài khoản và nhãn **Số dư:** hiển thị rõ trong cả hai giao diện, trên máy tính và điện thoại.
+
+Kiểm thử ứng dụng: `npm run test:app`. Các kiểm thử dùng dữ liệu riêng, không thay mã bảo mật của tài khoản đang dùng và không gửi thư thật.
+
+## Quản lý avatar
 
 Mở nút menu ba sọc để vào Tài khoản, Vé của tôi, Chợ vé, Lịch sử on-chain hoặc Đăng xuất. Trong Tài khoản, chọn ảnh từ thiết bị, kéo ảnh để đổi vị trí và dùng thanh thu phóng để căn vào khung vuông trước khi lưu. Ảnh được lưu vào tài khoản trên cơ sở dữ liệu (cả SQLite và Turso), dùng lại sau khi đăng nhập.
 

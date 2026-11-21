@@ -8,7 +8,7 @@
     "test:contracts": "npx hardhat test",
     "deploy:local": "npx hardhat run scripts/deploy.js --network localhost",
     "deploy:fuji": "npx hardhat run scripts/deploy.js --network fuji",
-    "test:app": "node --test tests/backend.test.js tests/mailer.test.js"
+    "test:app": "node --test tests/*.test.js"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

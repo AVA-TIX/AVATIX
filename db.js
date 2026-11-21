@@ -142,6 +142,10 @@ async function _migrate(db) {
 
   // Migration an toàn: thêm cột mới vào bảng cũ
   const migrations = [
+    { check: `PRAGMA table_info(users)`, col: 'pin_hash', sql: `ALTER TABLE users ADD COLUMN pin_hash TEXT` },
+    { check: `PRAGMA table_info(users)`, col: 'pin_salt', sql: `ALTER TABLE users ADD COLUMN pin_salt TEXT` },
+    { check: `PRAGMA table_info(users)`, col: 'pin_attempts', sql: `ALTER TABLE users ADD COLUMN pin_attempts INTEGER DEFAULT 0` },
+    { check: `PRAGMA table_info(users)`, col: 'pin_locked_until', sql: `ALTER TABLE users ADD COLUMN pin_locked_until INTEGER DEFAULT 0` },
     { check: `PRAGMA table_info(users)`,   col: 'avatar',          sql: `ALTER TABLE users   ADD COLUMN avatar TEXT` },
     { check: `PRAGMA table_info(users)`,   col: 'wallet',          sql: `ALTER TABLE users   ADD COLUMN wallet TEXT` },
     { check: `PRAGMA table_info(users)`,   col: 'email_verified',  sql: `ALTER TABLE users   ADD COLUMN email_verified INTEGER DEFAULT 0` },

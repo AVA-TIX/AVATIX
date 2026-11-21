@@ -3,8 +3,9 @@
 .top .top-brand { order:0; gap:16px; margin:0 auto 0 0; }
 .brand-caption { color:var(--text-muted); font-size:14px; border-left:1px solid var(--border); padding-left:16px; }
 .top .top-wallet { order:0; display:flex; align-items:center; gap:12px; margin:0; }
-.top .bal { border:0; background:none; padding:0; font-size:14px; cursor:default; box-shadow:none; white-space:nowrap; }
-.top .bal-label { color:var(--text-muted); }
+.top .bal { display:inline-flex; align-items:baseline; gap:.4em; border:0; background:none; padding:0; font-size:14px; cursor:default; box-shadow:none; white-space:nowrap; }
+.top .bal-label { display:inline; color:var(--text-muted); }
+.top .bal #bal { font-size:inherit; }
 .top .account-shortcut { display:flex; align-items:center; gap:9px; border:0; background:none; padding:0; cursor:pointer; font-size:14px; font-weight:500; }
 .avatar { display:inline-flex; flex:none; width:36px; height:36px; border-radius:50%; overflow:hidden; align-items:center; justify-content:center; background:#f1eded; color:#913232; font-weight:600; border:1px solid #e8dede; }
 .avatar img { width:100%; height:100%; object-fit:cover; }
@@ -50,6 +51,8 @@
   .menu-toggle { padding:8px 10px; }
   .menu-toggle > span:last-child { display:none; }
   .menu-panel { right:0; }
+  .top .site-nav { position:static; }
+  .top .menu-panel { top:calc(100% + 8px); right:16px; }
   .profile-summary { gap:14px; }
   .profile-avatar { width:64px; height:64px; }
   .avatar-crop { width:min(100%,260px); }
