@@ -10,9 +10,10 @@ const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':
 const serviceError = message => Object.assign(new Error(message), { c: 503 });
 
 function brevoConfig() {
-  const apiKey = String(process.env.BREVO_API_KEY || '').trim();
-  const fromEmail = String(process.env.MAIL_FROM_EMAIL || '').trim();
-  const fromName = String(process.env.MAIL_FROM_NAME || 'AVA-TIX Security').trim() || 'AVA-TIX Security';
+  const clean = v => String(v || '').trim().replace(/^["']|["']$/g, '').trim();
+  const apiKey = clean(process.env.BREVO_API_KEY);
+  const fromEmail = clean(process.env.MAIL_FROM_EMAIL);
+  const fromName = clean(process.env.MAIL_FROM_NAME) || 'AVA-TIX Security';
   return { apiKey, fromEmail, fromName };
 }
 
@@ -131,6 +132,8 @@ async function sendOtpEmail({ to, username, code, purpose }) {
         signal: AbortSignal.timeout(10000),
       });
       if (!response.ok) {
+        const errInfo = await response.json?.().catch(() => null);
+        console.error(`[Mailer][Brevo] HTTP ${response.status}${errInfo?.code ? ` (${errInfo.code})` : ''}`);
         throw new Error(`Brevo HTTP ${response.status}`);
       }
       return { mode: "brevo" };
