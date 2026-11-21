@@ -52,7 +52,7 @@ function renderHero(list){
     ${topEv.max_per_user>0?`<div class="hero-meta-item"> <b>Tối đa ${topEv.max_per_user} vé/TK</b></div>`:''}
    </div>
    <div class="hero-actions">
-    ${isLimitReached?`<button class="btn" disabled style="background:#475569;border-color:#475569;cursor:not-allowed" title="Bạn đã mua tối đa ${topEv.max_per_user} vé">Đã đạt giới hạn (${topEv.max_per_user} vé)</button>`:
+    ${isLimitReached?`<button class="btn" disabled title="Bạn đã mua tối đa ${topEv.max_per_user} vé">Đã đạt giới hạn (${topEv.max_per_user} vé)</button>`:
       `<button class="btn" ${topEv.remain>0?'':'disabled'} onclick="confirmBuy('buy',{event:${topEv.id}},${topEv.id},'open')">
        ${topEv.remain>0?'Mua vé ngay':'Hết vé'}
       </button>`}
@@ -82,8 +82,8 @@ function draw(){
   const myTicketCount=tk.filter(t=>t.event===e.id&&t.used!=2).length;
   const isLimitReached=e.max_per_user>0&&myTicketCount>=e.max_per_user;
   const limitLabel=e.max_per_user>0?`<div class=event-details-row><span> Giới hạn: <b>Tối đa ${e.max_per_user} vé/TK</b> ${myTicketCount>0?`(đã mua ${myTicketCount})`:''}</span></div>`:'';
-  return `<article class=card>
-   <div class="event-poster ${th.cls}" style="background-image:linear-gradient(180deg, rgba(15,23,42,0.15) 0%, rgba(15,23,42,0.75) 100%), url('${esc(imgUrl)}')">
+  return `<article class="card event-card ${th.cls}">
+   <div class="event-poster ${th.cls}" style="background-image:linear-gradient(180deg, rgba(15,23,42,0.15) 0%, rgba(15,23,42,0.35) 100%), url('${esc(imgUrl)}')">
     <div class=event-poster-overlay></div>
     <div class=date-badge>
      <div class=month>${db.m}</div>
@@ -107,7 +107,7 @@ function draw(){
      </div>
      <div class=card-btn-group>
       <button class="btn sm ghost" onclick="viewDetail(${e.id},'open')">Chi tiết</button>
-      ${isLimitReached?`<button class="btn sm" disabled style="background:#475569;border-color:#475569;cursor:not-allowed" title="Bạn đã mua đủ số lượng vé tối đa">Đã đạt giới hạn (${e.max_per_user} vé)</button>`:
+      ${isLimitReached?`<button class="btn sm" disabled title="Bạn đã mua đủ số lượng vé tối đa">Đã đạt giới hạn (${e.max_per_user} vé)</button>`:
         `<button class="btn sm" ${e.remain>0?'':'disabled'} onclick="confirmBuy('buy',{event:${e.id}},${e.id},'open')">
          ${e.remain>0?'Mua vé':'Hết vé'}
         </button>`}
@@ -119,8 +119,8 @@ function draw(){
  :tab==='mine'?tk.filter(hit).map(t=>{
   const th=bannerTheme(t.name),db=parseDateBadge(t.date),imgUrl=getEventImg(t);
   const isRefunded=t.used===2;
-  return `<article class="card e-ticket">
-   <div class="event-poster ${th.cls}" style="height:130px;background-image:linear-gradient(180deg, rgba(15,23,42,0.2) 0%, rgba(15,23,42,0.8) 100%), url('${esc(imgUrl)}')">
+  return `<article class="card event-card e-ticket ${th.cls}">
+   <div class="event-poster ${th.cls}" style="height:130px;background-image:linear-gradient(180deg, rgba(15,23,42,0.2) 0%, rgba(15,23,42,0.35) 100%), url('${esc(imgUrl)}')">
     <div class=event-poster-overlay></div>
     <div class=date-badge>
      <div class=month>${db.m}</div>
@@ -134,7 +134,7 @@ function draw(){
     <div class=event-details>
      <div class=event-details-row> <span>${dmy(t.date)}</span></div>
      <div class=event-details-row> <span>${esc(t.venue)}</span></div>
-     ${isRefunded?`<div class=event-details-row><span style="color:#22c55e;font-weight:600">Tiền vé đã hoàn 100% (${vnd(t.orig)}) vào ví</span></div>`:''}
+     ${isRefunded?`<div class=event-details-row><span style="color:var(--positive);font-weight:600">Tiền vé đã hoàn 100% (${vnd(t.orig)}) vào ví</span></div>`:''}
     </div>
     <div class=ticket-notch-divider><div class=ticket-dashed-line></div></div>
     <div class=card-action-bar style="border-top:none;padding-top:0">
@@ -142,7 +142,7 @@ function draw(){
       <span class=price-label>Giá gốc</span>
       <span class=price-amount style="font-size:16px">${vnd(t.orig)}</span>
      </div>
-     <div>${isRefunded?'<span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border-color:rgba(239,68,68,0.3)">Đã hoàn tiền 100%</span>':t.used===1?'<span class="badge ok"> Đã check-in</span>':t.listed?`<span class=badge> Rao bán ${vnd(t.listed)}</span>`:'<span class="badge ok"> Đang sở hữu</span>'}</div>
+     <div>${isRefunded?'<span class="badge" style="background:var(--negative-bg);color:var(--negative);border-color:var(--negative)">Đã hoàn tiền 100%</span>':t.used===1?'<span class="badge ok"> Đã check-in</span>':t.listed?`<span class=badge> Rao bán ${vnd(t.listed)}</span>`:'<span class="badge ok"> Đang sở hữu</span>'}</div>
     </div>
     <div class=card-btn-group style="justify-content:flex-end;margin-top:10px">
      <button class="btn sm ghost" onclick="viewDetail(${t.id},'mine')">Chi tiết</button>
@@ -157,8 +157,8 @@ function draw(){
   const th=bannerTheme(t.name),db=parseDateBadge(t.date),imgUrl=getEventImg(t);
   const myTicketCount=tk.filter(x=>x.event===t.event&&x.used!=2).length;
   const isLimitReached=t.max_per_user>0&&myTicketCount>=t.max_per_user;
-  return `<article class=card>
-   <div class="event-poster ${th.cls}" style="background-image:linear-gradient(180deg, rgba(15,23,42,0.15) 0%, rgba(15,23,42,0.75) 100%), url('${esc(imgUrl)}')">
+  return `<article class="card event-card ${th.cls}">
+   <div class="event-poster ${th.cls}" style="background-image:linear-gradient(180deg, rgba(15,23,42,0.15) 0%, rgba(15,23,42,0.35) 100%), url('${esc(imgUrl)}')">
     <div class=event-poster-overlay></div>
     <div class=date-badge>
      <div class=month>${db.m}</div>
@@ -183,7 +183,7 @@ function draw(){
      <div class=card-btn-group>
       <button class="btn sm ghost" onclick="viewDetail(${t.id},'market')">Chi tiết</button>
       ${t.owner===me.id?'<span class=badge>Vé của bạn</span>':
-        isLimitReached?`<button class="btn sm" disabled style="background:#475569;border-color:#475569;cursor:not-allowed" title="Bạn đã mua tối đa ${t.max_per_user} vé cho sự kiện này">Đã đạt giới hạn (${t.max_per_user} vé)</button>`:
+        isLimitReached?`<button class="btn sm" disabled title="Bạn đã mua tối đa ${t.max_per_user} vé cho sự kiện này">Đã đạt giới hạn (${t.max_per_user} vé)</button>`:
         `<button class="btn sm" onclick="confirmBuy('buy-resale',{ticket:${t.id}},${t.id},'market')"> Mua lại vé</button>`}
      </div>
     </div>
@@ -213,7 +213,7 @@ function viewDetail(id,src){
    ${src==='open'?`<tr><th>Nhà tổ chức</th><td>${esc(o.org)}</td></tr>
    <tr><th>Trạng thái</th><td>${isCancelled?'<span class="badge out"> Đã hủy show</span>':'<span class="badge ok"> Đang mở bán</span>'}</td></tr>
    ${maxPerUser>0?`<tr><th>Giới hạn mua</th><td><b style="color:var(--tb-green)">Tối đa ${maxPerUser} vé / tài khoản</b> ${myTicketCount>0?`(Bạn đang có: ${myTicketCount} vé)`:''}</td></tr>`:''}`:''}
-   ${src==='mine'?`<tr><th>Mã vé</th><td>#${o.id} ${o.token_id?`<span class="badge nft"> NFT #${o.token_id}</span>`:''}</td></tr><tr><th>Trạng thái</th><td>${o.used===2?'<span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border-color:rgba(239,68,68,0.3)"> Đã hoàn tiền 100% (Show bị hủy)</span>':o.used===1?'<span class="badge ok"> Đã check-in</span>':o.listed?`<span class=badge> Đang rao bán ${vnd(o.listed)}</span>`:'<span class="badge ok"> Đang sở hữu</span>'}</td></tr>`:''}
+   ${src==='mine'?`<tr><th>Mã vé</th><td>#${o.id} ${o.token_id?`<span class="badge nft"> NFT #${o.token_id}</span>`:''}</td></tr><tr><th>Trạng thái</th><td>${o.used===2?'<span class="badge" style="background:var(--negative-bg);color:var(--negative);border-color:var(--negative)"> Đã hoàn tiền 100% (Show bị hủy)</span>':o.used===1?'<span class="badge ok"> Đã check-in</span>':o.listed?`<span class=badge> Đang rao bán ${vnd(o.listed)}</span>`:'<span class="badge ok"> Đang sở hữu</span>'}</td></tr>`:''}
    ${src==='market'?`<tr><th>Người bán lại</th><td>${esc(o.seller)}</td></tr><tr><th>Giá gốc</th><td>${vnd(o.orig)}</td></tr>${maxPerUser>0?`<tr><th>Giới hạn show</th><td>Tối đa ${maxPerUser} vé / tài khoản (Bạn đang có: ${myTicketCount})</td></tr>`:''}`:''}
    <tr><th>Ngày tổ chức</th><td>${dmy(o.date)}</td></tr>
    <tr><th>Địa điểm</th><td>${esc(o.venue)}</td></tr>
@@ -226,8 +226,8 @@ function viewDetail(id,src){
   </div>
   <div class=row>
    <button class="btn ghost" onclick=closeModal()>Đóng</button>
-   ${src==='open'&&!isCancelled&&o.remain>0?(isLimitReached?`<button class="btn" disabled style="background:#475569;border-color:#475569;cursor:not-allowed">Đã đạt giới hạn (${maxPerUser} vé)</button>`:`<button class=btn onclick="confirmBuy('buy',{event:${o.id}},${o.id},'open')"> Mua vé ngay</button>`):''}
-   ${src==='market'&&o.owner!==me.id&&!isCancelled?(isLimitReached?`<button class="btn" disabled style="background:#475569;border-color:#475569;cursor:not-allowed">Đã đạt giới hạn (${maxPerUser} vé)</button>`:`<button class=btn onclick="confirmBuy('buy-resale',{ticket:${o.id}},${o.id},'market')"> Mua lại vé</button>`):''}
+   ${src==='open'&&!isCancelled&&o.remain>0?(isLimitReached?`<button class="btn" disabled>Đã đạt giới hạn (${maxPerUser} vé)</button>`:`<button class=btn onclick="confirmBuy('buy',{event:${o.id}},${o.id},'open')"> Mua vé ngay</button>`):''}
+   ${src==='market'&&o.owner!==me.id&&!isCancelled?(isLimitReached?`<button class="btn" disabled>Đã đạt giới hạn (${maxPerUser} vé)</button>`:`<button class=btn onclick="confirmBuy('buy-resale',{ticket:${o.id}},${o.id},'market')"> Mua lại vé</button>`):''}
    ${src==='mine'&&!o.used?`<button class="btn green" onclick="qr(${o.id})">Mở mã QR vào cổng</button>`:''}
   </div>`);
 }

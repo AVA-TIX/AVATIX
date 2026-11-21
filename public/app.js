@@ -105,14 +105,14 @@ function showChainInfo(){
     <div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button></div>`);
 }
 async function qr(id){
-  if(!window.me.pinConfigured){openPinSettings(true);return}
+  if(!window.me.pinConfigured){openPinSettings(()=>qr(id));return}
   const unlocked=await askPin({title:'Mở mã QR của vé',description:'Nhập mã bảo mật 6 số của bạn để xem vé. Mã QR sẽ được khóa lại khi bạn đóng cửa sổ.',verify:pin=>api('qr/'+id+'/unlock',{pin})});
   if(!unlocked)return;
   const unlockToken=unlocked.unlockToken;
   openModal(`<h2>Mã QR vào cổng</h2>
-    <div class=qrbox id=qb><div style="padding:22px;color:var(--text-muted)"> Đang tạo mã QR động...</div></div>
+    <div class=qrbox id=qb><p class=qr-message>Đang tạo mã QR động...</p></div>
     <p class="note" id=cd style="text-align:center"></p>
-    <div class=row><input id=qt readonly class=mono style="flex:1"><button class="btn sm ghost" id=cp>Copy mã</button></div>
+    <div class="row qr-token-row"><input id=qt readonly class=mono aria-label="Nội dung mã QR"><button class="btn sm ghost" id=cp>Copy mã</button></div>
     <p class=note>Mã tự đổi mỗi 20 giây. Ảnh chụp màn hình sẽ hết hạn.</p>
     <div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button></div>`);
   const cp = $('#cp');
@@ -138,13 +138,12 @@ async function qr(id){
       if(qb) {
         qb.innerHTML = `<div style="padding:22px 14px;text-align:center">
           <div style="font-size:36px;margin-bottom:8px"></div>
-          <div style="font-weight:700;color:var(--negative);font-size:15px;margin-bottom:6px">Không thể tạo mã QR</div>
-          <div class="note" style="color:var(--text);font-size:13.5px">${esc(e.message)}</div>
+          <div class=qr-message><b>Không thể tạo mã QR</b><p>${esc(e.message)}</p></div>
         </div>`;
       }
       if($('#cd')) $('#cd').textContent = '';
       clearInterval(window.tm);
-      if(e.st===403){$('#qb').innerHTML='<p class=note>Vé đã được khóa lại để bảo vệ tài khoản.</p><button class=btn id=reopenQr>Mở khóa lại</button>';$('#reopenQr').onclick=()=>qr(id)}
+      if(e.st===403){$('#qb').innerHTML='<div class=qr-message><p>Vé đã được khóa lại để bảo vệ tài khoản.</p><button class=btn id=reopenQr>Mở khóa lại</button></div>';$('#reopenQr').onclick=()=>qr(id)}
       toast(e.message, 1);
     }
   };
@@ -243,7 +242,6 @@ async function init(role){
     const me=await api('me');
     if(me.role!==role){location='/'+me.role+'.html';return}
     window.me=me;renderTop(me,role);
-    if(!me.pinConfigured)openPinSettings(true);
     return me;
   }catch{location='/login.html'}
 }

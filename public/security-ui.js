@@ -40,21 +40,9 @@ function mountPasswordEyes(root=document){
     let timer;
     const hide=()=>{clearTimeout(timer);input.type='password';button.setAttribute('aria-label','Xem mật khẩu');button.setAttribute('aria-pressed','false')};
     input.addEventListener('input',hide);
-    button.onclick=async()=>{
+    button.onclick=()=>{
       if(input.type==='text'){hide();return}
       if(!input.value){toast('Hãy nhập mật khẩu trước.',1);input.focus();return}
-      const allowed=await askPin({title:'Xem mật khẩu đang nhập',description:'Nhập mã bảo mật để hiển thị mật khẩu trong 15 giây.',verify:async pin=>{
-        const registering=input.closest('#fr'),setting=input.closest('#pinSettingsForm');
-        if(registering||setting&&!window.me?.pinConfigured){
-          const chosen=document.querySelector(registering?'#registerPin':'#pinNew').value;
-          const confirmation=document.querySelector(registering?'#registerPinAgain':'#pinAgain').value;
-          if(!/^\d{6}$/.test(chosen)||chosen!==confirmation)throw new Error('Hãy tạo và xác nhận mã bảo mật 6 số trước.');
-          if(pin!==chosen)throw new Error('Mã bảo mật không đúng.');
-          return true;
-        }
-        return api('security/pin/verify',{pin,identifier:window.me?.username||document.querySelector('#lu')?.value||document.querySelector('#fi')?.value});
-      }});
-      if(!allowed||!input.isConnected)return;
       input.type='text';button.setAttribute('aria-label','Ẩn mật khẩu');button.setAttribute('aria-pressed','true');timer=setTimeout(hide,15000);
     };
   });
@@ -62,23 +50,19 @@ function mountPasswordEyes(root=document){
 document.addEventListener('visibilitychange',()=>{if(document.hidden)document.querySelectorAll('.password-field input[type=text]').forEach(input=>{input.type='password';const button=input.parentElement.querySelector('button');button.setAttribute('aria-label','Xem mật khẩu');button.setAttribute('aria-pressed','false')})});
 document.addEventListener('DOMContentLoaded',()=>mountPasswordEyes());
 async function signIn(username,password){
-  let response=await api('login',{username,password});
-  if(response.pinRequired){
-    response=await askPin({title:'Xác thực đăng nhập',description:'Nhập mã bảo mật 6 số bạn đã tạo cho tài khoản này.',verify:pin=>api('login',{username,password,pin})});
-    if(!response)return;
-  }
+  const response=await api('login',{username,password});
   location='/'+response.role+'.html';
 }
 function pinFields(){return `<label for=pinNew>Mã bảo mật mới · 6 chữ số</label><input class=pin-entry id=pinNew type=password inputmode=numeric pattern="[0-9]{6}" minlength=6 maxlength=6 autocomplete=off required><label for=pinAgain>Nhập lại mã bảo mật</label><input class=pin-entry id=pinAgain type=password inputmode=numeric pattern="[0-9]{6}" minlength=6 maxlength=6 autocomplete=off required>`}
-function openPinSettings(required=false){
+function openPinSettings(onSaved){
   ensureModal();const configured=Boolean(window.me?.pinConfigured);
-  openModal(`<div class=dialog-kicker>Bảo mật hai bước</div><h2>${configured?'Đổi mã bảo mật':'Tạo mã bảo mật của bạn'}</h2><p class=note>${configured?'Mã mới sẽ thay thế mã hiện tại và khóa lại các QR đang mở.':'Chọn 6 chữ số riêng để xác nhận đăng nhập, xem mật khẩu đang nhập và mở QR vé. Bạn cần hoàn tất bước này để sử dụng tài khoản.'}</p><form id=pinSettingsForm><label for=pinCurrentPassword>Mật khẩu tài khoản</label><input id=pinCurrentPassword type=password autocomplete=current-password required>${configured?'<label for=pinOld>Mã bảo mật hiện tại</label><input class=pin-entry id=pinOld type=password inputmode=numeric pattern="[0-9]{6}" maxlength=6 autocomplete=off required>':''}${pinFields()}<p class="note err" id=pinSettingsError role=alert></p><div class=row>${required?'<button type=button class="btn ghost" onclick=logout()>Đăng xuất</button>':'<button type=button class="btn ghost" onclick=openSecurityModal()>Quay lại</button>'}<button class=btn id=savePin>${configured?'Cập nhật mã':'Tạo mã bảo mật'}</button></div></form>`);
-  $('#m .mb').dataset.required=required?'true':'false';
+  openModal(`<div class=dialog-kicker>Bảo vệ vé và tài khoản</div><h2>${configured?'Đổi mã bảo mật':'Tạo mã bảo mật của bạn'}</h2><p class=note>${configured?'Mã mới sẽ thay thế mã hiện tại và khóa lại các QR đang mở.':'Chọn 6 chữ số riêng để mở QR vé và xác nhận đổi mật khẩu. Bạn không cần nhập mã khi đăng nhập.'}</p><form id=pinSettingsForm><label for=pinCurrentPassword>Mật khẩu tài khoản</label><input id=pinCurrentPassword type=password autocomplete=current-password required>${configured?'<label for=pinOld>Mã bảo mật hiện tại</label><input class=pin-entry id=pinOld type=password inputmode=numeric pattern="[0-9]{6}" maxlength=6 autocomplete=off required>':''}${pinFields()}<p class="note err" id=pinSettingsError role=alert></p><div class=row><button type=button class="btn ghost" onclick=openSecurityModal()>Quay lại</button><button class=btn id=savePin>${configured?'Cập nhật mã':'Tạo mã bảo mật'}</button></div></form>`);
   $('#pinSettingsForm').onsubmit=async e=>{
     e.preventDefault();const button=$('#savePin');button.disabled=true;
     try{
       await api('security/pin/'+(configured?'change':'setup'),{currentPassword:$('#pinCurrentPassword').value,oldPin:$('#pinOld')?.value,pin:$('#pinNew').value,pinConfirmation:$('#pinAgain').value});
-      window.me=await api('me');renderTop(window.me,window.me.role);openSecurityModal();toast('Đã lưu mã bảo mật của bạn.');
+      window.me=await api('me');renderTop(window.me,window.me.role);toast('Đã lưu mã bảo mật của bạn.');
+      if(typeof onSaved==='function')onSaved();else openSecurityModal();
     }catch(error){$('#pinSettingsError').textContent=error.message}finally{if(button.isConnected)button.disabled=false}
   };
 }
@@ -91,27 +75,33 @@ function openPinRecovery(){
   };
   $('#pinRecoveryForm').onsubmit=async e=>{
     e.preventDefault();$('#confirmPinRecovery').disabled=true;
-    try{await api('security/pin/reset/confirm',{identifier:$('#pinRecoveryUser').value,currentPassword:$('#pinRecoveryPassword').value,code:$('#pinRecoveryOtp').value,pin:$('#pinNew').value,pinConfirmation:$('#pinAgain').value});if(window.me){window.me=await api('me');openSecurityModal()}else closeModal();toast('Đã đặt lại mã bảo mật. Bạn có thể đăng nhập bằng mã mới.');}
+    try{await api('security/pin/reset/confirm',{identifier:$('#pinRecoveryUser').value,currentPassword:$('#pinRecoveryPassword').value,code:$('#pinRecoveryOtp').value,pin:$('#pinNew').value,pinConfirmation:$('#pinAgain').value});if(window.me){window.me=await api('me');openSecurityModal()}else closeModal();toast('Đã đặt lại mã bảo mật để mở QR và xác nhận đổi mật khẩu.');}
     catch(error){$('#pinRecoveryError').textContent=error.message;$('#confirmPinRecovery').disabled=false}
   };
 }
 function openSecurityModal(){
   const me=window.me;ensureModal();
-  openModal(`<div class=dialog-kicker>Hồ sơ của bạn</div><h2>Tài khoản</h2><div class=profile-summary>${avatarHtml(me,'profile-avatar')}<div><b>${esc(me.username)}</b><p class=note>${me.role==='customer'?'Khách hàng':'Nhà tổ chức'}</p><button class="btn ghost sm" onclick=openAvatarEditor()>Thay ảnh đại diện</button></div></div><dl class=account-details><div><dt>Email</dt><dd>${esc(me.email)} <span class="badge ${me.emailVerified?'ok':'out'}">${me.emailVerified?'Đã xác thực':'Chưa xác thực'}</span></dd></div><div><dt>Mã bảo mật</dt><dd>${me.pinConfigured?'Đã thiết lập · 6 chữ số':'Chưa thiết lập'}</dd></div><div><dt>Thiết bị</dt><dd>${me.currentDevice==='mobile'?'Điện thoại':'Máy tính'}</dd></div></dl><div class=security-actions><div><b>Mật khẩu</b><p class=note>Thay đổi mật khẩu đăng nhập bằng xác thực email.</p></div><button class="btn ghost sm" onclick=openChangePassword()>Đổi mật khẩu</button></div><div class=security-actions><div><b>Mã bảo mật</b><p class=note>Xác nhận khi đăng nhập và mở thông tin nhạy cảm.</p></div><button class="btn ghost sm" onclick=openPinSettings()>${me.pinConfigured?'Đổi mã':'Tạo mã'}</button></div><div class=row><button class=link-btn onclick=openPinRecovery()>Quên mã bảo mật?</button>${me.emailVerified?'':'<button class="btn ghost sm" onclick=openEmailVerification()>Xác thực email</button>'}<button class="btn ghost" onclick=closeModal()>Đóng</button></div>`);
+  openModal(`<div class=dialog-kicker>Hồ sơ của bạn</div><h2>Tài khoản</h2><div class=profile-summary>${avatarHtml(me,'profile-avatar')}<div><b>${esc(me.username)}</b><p class=note>${me.role==='customer'?'Khách hàng':'Nhà tổ chức'}</p><button class="btn ghost sm" onclick=openAvatarEditor()>Thay ảnh đại diện</button></div></div><dl class=account-details><div><dt>Email</dt><dd>${esc(me.email)} <span class="badge ${me.emailVerified?'ok':'out'}">${me.emailVerified?'Đã xác thực':'Chưa xác thực'}</span></dd></div><div><dt>Mã bảo mật</dt><dd>${me.pinConfigured?'Đã thiết lập · 6 chữ số':'Chưa thiết lập'}</dd></div><div><dt>Thiết bị</dt><dd>${me.currentDevice==='mobile'?'Điện thoại':'Máy tính'}</dd></div></dl><div class=security-actions><div><b>Mật khẩu</b><p class=note>Thay đổi mật khẩu đăng nhập bằng xác thực email.</p></div><button class="btn ghost sm" onclick=openChangePassword()>Đổi mật khẩu</button></div><div class=security-actions><div><b>Mã bảo mật</b><p class=note>Chỉ yêu cầu khi mở QR vé và đổi mật khẩu.</p></div><button class="btn ghost sm" onclick=openPinSettings()>${me.pinConfigured?'Đổi mã':'Tạo mã'}</button></div><div class=row><button class=link-btn onclick=openPinRecovery()>Quên mã bảo mật?</button>${me.emailVerified?'':'<button class="btn ghost sm" onclick=openEmailVerification()>Xác thực email</button>'}<button class="btn ghost" onclick=closeModal()>Đóng</button></div>`);
 }
 function openEmailVerification(){
   openModal('<h2>Xác thực email</h2><p class=note>Mã OTP sẽ gửi đến email đã đăng ký.</p><button class="btn ghost" id=evSend>Gửi mã OTP</button><p class=note id=evBox role=status></p><form id=emailVerifyForm><label for=evCode>OTP 6 chữ số</label><input class=pin-entry id=evCode inputmode=numeric pattern="[0-9]{6}" maxlength=6 autocomplete=one-time-code required><p class="note err" id=evError role=alert></p><div class=row><button type=button class="btn ghost" onclick=openSecurityModal()>Quay lại</button><button class=btn>Xác nhận</button></div></form>');
   $('#evSend').onclick=async()=>{const b=$('#evSend');b.disabled=true;try{const r=await api('verify-email/request',{});$('#evBox').textContent='Đã gửi OTP tới '+r.maskedEmail}catch(e){$('#evError').textContent=e.message}finally{if(b.isConnected)b.disabled=false}};
   $('#emailVerifyForm').onsubmit=async e=>{e.preventDefault();try{await api('verify-email/confirm',{code:$('#evCode').value});window.me=await api('me');openSecurityModal()}catch(e){$('#evError').textContent=e.message}};
 }
-function openChangePassword(){
+async function openChangePassword(){
   if(!window.me.emailVerified){openEmailVerification();return}
+  let headers={};
+  if(window.me.pinConfigured){
+    const unlocked=await askPin({title:'Xác nhận đổi mật khẩu',description:'Nhập mã bảo mật 6 số để mở chức năng đổi mật khẩu.',verify:pin=>api('change-password/unlock',{pin})});
+    if(!unlocked)return;
+    headers={'X-Password-Unlock':unlocked.unlockToken};
+  }
   openModal(`<div class=dialog-kicker>Bảo mật tài khoản</div><h2>Đổi mật khẩu</h2><p class=note>Nhập mật khẩu hiện tại và OTP gửi về email để xác nhận thay đổi.</p><form id=changePasswordForm><label for=cpOld>Mật khẩu hiện tại</label><input id=cpOld type=password autocomplete=current-password required><button type=button class="btn ghost sm" id=cpSend>Gửi OTP xác nhận</button><p class=note id=cpBox role=status></p><label for=cpCode>OTP nhận qua email</label><input class=pin-entry id=cpCode inputmode=numeric pattern="[0-9]{6}" maxlength=6 autocomplete=one-time-code required><label for=cpNew>Mật khẩu mới · ít nhất 8 ký tự, 1 chữ hoa và 1 số</label><input id=cpNew type=password autocomplete=new-password minlength=8 required><label for=cpNew2>Nhập lại mật khẩu mới</label><input id=cpNew2 type=password autocomplete=new-password required><p class="note err" id=cpError role=alert></p><div class=row><button type=button class="btn ghost" onclick=openSecurityModal()>Quay lại</button><button class=btn id=cpOk>Lưu mật khẩu mới</button></div></form>`);
-  $('#cpSend').onclick=async()=>{const b=$('#cpSend');b.disabled=true;try{const r=await api('change-password/request',{currentPassword:$('#cpOld').value});$('#cpBox').textContent='Đã gửi OTP tới '+r.maskedEmail}catch(e){$('#cpError').textContent=e.message}finally{if(b.isConnected)b.disabled=false}};
+  $('#cpSend').onclick=async()=>{const b=$('#cpSend');b.disabled=true;try{const r=await api('change-password/request',{currentPassword:$('#cpOld').value},headers);$('#cpBox').textContent='Đã gửi OTP tới '+r.maskedEmail}catch(e){$('#cpError').textContent=e.message}finally{if(b.isConnected)b.disabled=false}};
   $('#changePasswordForm').onsubmit=async e=>{
     e.preventDefault();if($('#cpNew').value!==$('#cpNew2').value){$('#cpError').textContent='Mật khẩu xác nhận không khớp.';return}
     const b=$('#cpOk');b.disabled=true;
-    try{await api('change-password/confirm',{currentPassword:$('#cpOld').value,newPassword:$('#cpNew').value,code:$('#cpCode').value});openSecurityModal();toast('Đã đổi mật khẩu thành công.')}
+    try{await api('change-password/confirm',{currentPassword:$('#cpOld').value,newPassword:$('#cpNew').value,code:$('#cpCode').value},headers);openSecurityModal();toast('Đã đổi mật khẩu thành công.')}
     catch(e){$('#cpError').textContent=e.message}finally{if(b.isConnected)b.disabled=false}
   };
 }

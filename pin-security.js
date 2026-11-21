@@ -37,17 +37,21 @@ module.exports = (db, secret) => {
       if (locks.get(userId) === next) locks.delete(userId);
     }
   }
-  function ticketGrant(user, ticket, session) {
-    const payload = Buffer.from(JSON.stringify({ u: user.id, t: Number(ticket), exp: Date.now() + 120000, s: digest(session), v: digest(user.pin_hash) })).toString('base64url');
+  function grant(user, purpose, session, ttl) {
+    const payload = Buffer.from(JSON.stringify({ u: user.id, p: purpose, exp: Date.now() + ttl, s: digest(session), v: digest(user.pin_hash + '|' + user.hash) })).toString('base64url');
     return payload + '.' + digest(payload);
   }
-  function checkTicketGrant(token, user, ticket, session) {
+  function checkGrant(token, user, purpose, session, message) {
     try {
       const [payload, signature, extra] = String(token || '').split('.');
       if (extra || !equal(digest(payload), signature)) throw new Error();
       const data = JSON.parse(Buffer.from(payload, 'base64url').toString());
-      if (!user.pin_hash || data.u !== user.id || data.t !== Number(ticket) || data.exp <= Date.now() || data.s !== digest(session) || data.v !== digest(user.pin_hash)) throw new Error();
-    } catch { throw fail('Nhập mã bảo mật để mở mã QR của vé này.', 403); }
+      if (!user.pin_hash || data.u !== user.id || data.p !== purpose || !Number.isFinite(data.exp) || data.exp <= Date.now() || data.s !== digest(session) || data.v !== digest(user.pin_hash + '|' + user.hash)) throw new Error();
+    } catch { throw fail(message, 403); }
   }
-  return { credentials, verify, ticketGrant, checkTicketGrant };
+  const ticketGrant = (user, ticket, session) => grant(user, 'ticket:' + Number(ticket), session, 120000);
+  const checkTicketGrant = (token, user, ticket, session) => checkGrant(token, user, 'ticket:' + Number(ticket), session, 'Nhập mã bảo mật để mở mã QR của vé này.');
+  const passwordGrant = (user, session) => grant(user, 'change-password', session, 600000);
+  const checkPasswordGrant = (token, user, session) => checkGrant(token, user, 'change-password', session, 'Hãy xác nhận mã bảo mật để đổi mật khẩu. Quyền xác nhận có hiệu lực 10 phút.');
+  return { credentials, verify, ticketGrant, checkTicketGrant, passwordGrant, checkPasswordGrant };
 };

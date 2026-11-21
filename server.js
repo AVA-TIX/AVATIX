@@ -188,7 +188,9 @@ async function verifyOtp(userId, purpose, rawCode) {
 // ─── Auth routes ─────────────────────────────────────────────────────────────
 route('post', 'register', 0, async r => {
   const pin = pinSecurity.credentials(r.body.pin, r.body.pinConfirmation);
-  const { username: u, password: p, email, phone, bank, role, cccd } = r.body;
+  const { username: u, password: p, bank, role, cccd } = r.body;
+  const email = String(r.body.email || '').trim().toLowerCase();
+  const phone = String(r.body.phone || '').trim();
   if (!/^.{8,}$/.test(u || '')) throw E('Tên đăng nhập tối thiểu 8 ký tự');
   if (!PASS_RE.test(p || '')) throw E('Mật khẩu tối thiểu 8 ký tự, gồm 1 chữ in hoa và 1 chữ số');
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email || '')) throw E('Email không hợp lệ');
@@ -197,6 +199,8 @@ route('post', 'register', 0, async r => {
   if (!['customer', 'organizer'].includes(role)) throw E('Loại tài khoản không hợp lệ');
   if (role === 'organizer' && !/^\d{12}$/.test(cccd || '')) throw E('Nhà cung cấp cần nhập CCCD gồm 12 số để xác minh');
   if (await db.get('SELECT 1 FROM users WHERE username=?', [u])) throw E('Tên đăng nhập đã tồn tại');
+  if (await db.get('SELECT 1 FROM users WHERE lower(trim(email))=?', [email])) throw E('Email đã được sử dụng cho tài khoản khác.', 409);
+  if (await db.get('SELECT 1 FROM users WHERE trim(phone)=?', [phone])) throw E('Số điện thoại đã được sử dụng cho tài khoản khác.', 409);
   const salt = crypto.randomBytes(16).toString('hex');
   const info = await db.run(
     'INSERT INTO users(username,hash,salt,email,phone,bank,role,cccd,email_verified) VALUES(?,?,?,?,?,?,?,?,0)',
@@ -227,7 +231,17 @@ route('post', 'verify-email/confirm', 0, async r => {
   return { ok: 1, emailVerified: true };
 });
 
+route('post', 'change-password/unlock', true, async r => {
+  await pinSecurity.verify(r.u.id, r.body.pin);
+  return { unlockToken: pinSecurity.passwordGrant(r.u, cookies(r).t) };
+});
+
+const authorizePasswordChange = r => {
+  if (r.u.pin_hash) pinSecurity.checkPasswordGrant(r.headers['x-password-unlock'], r.u, cookies(r).t);
+};
+
 route('post', 'change-password/request', true, async r => {
+  authorizePasswordChange(r);
   if (!r.u.email_verified) throw E('Vui lòng xác thực Email trước khi đổi mật khẩu');
   const cur = String(r.body.currentPassword || '');
   if (!cur || hash(cur, r.u.salt) !== r.u.hash) throw E('Mật khẩu hiện tại không đúng', 422);
@@ -236,6 +250,7 @@ route('post', 'change-password/request', true, async r => {
 });
 
 route('post', 'change-password/confirm', true, async r => {
+  authorizePasswordChange(r);
   if (!r.u.email_verified) throw E('Vui lòng xác thực Email trước khi đổi mật khẩu');
   const { currentPassword, newPassword, code } = r.body;
   if (!currentPassword || hash(currentPassword, r.u.salt) !== r.u.hash) throw E('Mật khẩu hiện tại không đúng', 422);
@@ -268,11 +283,6 @@ route('post', 'forgot-password/confirm', 0, async r => {
 route('post', 'login', 0, async (r, s) => {
   const u = await db.get('SELECT * FROM users WHERE username=?', [r.body.username || '']);
   if (!u || hash(r.body.password || '', u.salt) !== u.hash) throw E('Sai tên đăng nhập hoặc mật khẩu', 401);
-  if (u.pin_hash) {
-    if (!r.body.pin) return { pinRequired: true };
-    await pinSecurity.verify(u.id, r.body.pin);
-  }
-
   const dev = getDeviceType(r); // 'mobile' | 'desktop'
   const sid = crypto.randomBytes(16).toString('hex');
   const exp = Date.now() + 864e5; // 24 giờ
@@ -686,6 +696,8 @@ route('get', 'history', true, async r => {
 // ─── Static + Error handler ───────────────────────────────────────────────────
 app.use(express.static(__dirname + '/public', { index: 'login.html' }));
 app.use((e, r, s, n) => {
+  if (String(e.message).includes('EMAIL_ALREADY_USED')) e = E('Email đã được sử dụng cho tài khoản khác.', 409);
+  if (String(e.message).includes('PHONE_ALREADY_USED')) e = E('Số điện thoại đã được sử dụng cho tài khoản khác.', 409);
   console.error('[API Error]', e);
   s.status(e.c || 500).json({ e: e.message || 'Lỗi máy chủ' });
 });

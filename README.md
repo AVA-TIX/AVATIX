@@ -14,12 +14,16 @@ Khuyến nghị Node.js 22 LTS. Cài đúng phiên bản khóa bằng `npm ci` k
 
 ## Mã bảo mật 6 số và giao diện
 
-- Người đăng ký mới tự chọn và xác nhận mã bảo mật 6 chữ số. Tài khoản cũ được yêu cầu tạo mã sau lần đăng nhập tiếp theo; không có mã mặc định hoặc mã chung cho tài khoản demo.
-- Với tài khoản đã tạo mã, đăng nhập cần cả mật khẩu và mã bảo mật. Mã được băm bằng scrypt với salt riêng và HMAC dùng `SECRET`; giữ `SECRET` ổn định khi khởi động lại hay triển khai lại.
-- Nút con mắt chỉ hiển thị **mật khẩu đang nhập** sau khi xác nhận mã bảo mật, rồi tự che lại sau 15 giây, khi sửa nội dung hoặc chuyển khỏi trang. Không lưu hay cung cấp lại mật khẩu gốc từ cơ sở dữ liệu. Trong form đăng ký chưa gửi, nút con mắt đối chiếu mã vừa chọn trên thiết bị.
+- Người đăng ký mới tự chọn và xác nhận mã bảo mật 6 chữ số. Tài khoản cũ chưa có mã vẫn đăng nhập bình thường; có thể tạo mã trong Tài khoản hoặc khi mở QR lần đầu. Không có mã mặc định hoặc mã chung cho tài khoản demo.
+- Đăng nhập chỉ cần tên đăng nhập và mật khẩu, kể cả khi PIN đang tạm khóa. PIN chỉ bảo vệ QR và chức năng đổi mật khẩu, cùng thao tác thay chính mã PIN. Mã được băm bằng scrypt với salt riêng và HMAC dùng `SECRET`; giữ `SECRET` ổn định khi khởi động lại hay triển khai lại.
+- Nút con mắt hiển thị **mật khẩu đang nhập** ngay, không hỏi PIN, rồi tự che lại sau 15 giây, khi sửa nội dung hoặc chuyển khỏi trang. Không lưu hay cung cấp lại mật khẩu gốc từ cơ sở dữ liệu.
 - Mỗi lần mở QR vé đều cần mã bảo mật. Máy chủ kiểm tra quyền mở theo tài khoản, phiên đăng nhập và từng vé, có hiệu lực 2 phút để QR tự đổi sau mỗi 20 giây; hết thời gian phải mở khóa lại. Đổi/khôi phục mã bảo mật vô hiệu hóa quyền mở QR trước đó.
+- Đổi mật khẩu của tài khoản đã có PIN yêu cầu nhập PIN một lần khi mở form. Quyền xác nhận có hiệu lực 10 phút, chỉ dùng cho đổi mật khẩu và gắn với phiên hiện tại; không dùng thay quyền mở QR. Gửi OTP và lưu mật khẩu đều kiểm tra quyền này trên máy chủ, cùng mật khẩu hiện tại và OTP email. Đổi PIN hoặc mật khẩu vô hiệu hóa quyền cũ. Tài khoản cũ chưa có PIN dùng mật khẩu hiện tại + OTP email.
 - Nhập sai mã 5 lần sẽ khóa trong 5 phút; giới hạn lưu trong cơ sở dữ liệu và dùng chung giữa các phiên. Khôi phục mã bằng mật khẩu tài khoản và OTP thật gửi về email đã xác thực, kể cả khi chưa đăng nhập.
 - Mục Tài khoản có nút **Đổi mật khẩu** riêng. Chọn **Menu → Giao diện → Sáng / Tối** để đổi màu toàn trang, kể cả trước khi đăng nhập. Lựa chọn được nhớ trên trình duyệt và áp dụng khi tải lại hoặc chuyển trang. Loại tài khoản và nhãn **Số dư:** hiển thị rõ trong cả hai giao diện, trên máy tính và điện thoại.
+- Thẻ sự kiện và ô thống kê dùng các tông tím, xanh ngọc, cam sáng với chữ tối; nền trang và các khung thao tác đổi theo giao diện. QR luôn nằm giữa khung vuông trắng và co theo màn hình điện thoại.
+
+Mỗi địa chỉ email và số điện thoại chỉ được đăng ký cho một tài khoản. Email được cắt khoảng trắng và chuyển về chữ thường trước khi so sánh; số điện thoại giữ số 0 đầu. Máy chủ và database cùng chặn trùng, kể cả hai yêu cầu đồng thời, và trả lỗi HTTP 409 rõ ràng. Migration giữ nguyên tài khoản cũ nếu dữ liệu đã có trùng, nhưng ngăn tài khoản mới dùng lại thông tin đó và ngăn hai tài khoản xác thực cùng email.
 
 Kiểm thử ứng dụng: `npm run test:app`. Các kiểm thử dùng dữ liệu riêng, không thay mã bảo mật của tài khoản đang dùng và không gửi thư thật.
 
