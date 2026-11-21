@@ -8,8 +8,10 @@ test('durable outbox commits with business transaction and never retries uncerta
  await db.run('INSERT INTO tickets(id,event,owner,orig) VALUES(101,1,1,100)');
  await assert.rejects(db.transaction(async()=>{await chain.onBuyPrimary(101,'0xbuyer',1,100);throw Error('rollback')}));
  assert.equal((await db.get('SELECT COUNT(*) n FROM chain_jobs')).n,0);
- await db.transaction(()=>chain.onBuyPrimary(101,'0xbuyer',1,100));
+ await db.run("INSERT INTO txs(id,user,type,amount) VALUES(501,1,'buy',-100)");
+ await db.transaction(()=>chain.onBuyPrimary(101,'0xbuyer',1,100,{historyIds:[501]}));
  assert.equal(calls,0);await worker.tick();
+ assert.equal((await db.get('SELECT tx_hash FROM txs WHERE id=501')).tx_hash,'0xmint');
  assert.equal((await db.get('SELECT token_id FROM tickets WHERE id=101')).token_id,42);
  assert.equal((await db.get('SELECT state FROM chain_jobs')).state,'confirmed');
  await chain.onListResale(42,'0xbuyer',100,101);await worker.tick();
