@@ -84,8 +84,8 @@ document.addEventListener('keydown', e => {
     else if(!e.shiftKey&&(document.activeElement===items.at(-1)||document.activeElement===dialog)){e.preventDefault();items[0].focus()}
   }
 });
-function txHtml(txHash,url){
-  if(!txHash)return '<span class=note>Off-chain</span>';
+function txHtml(txHash,url,state){
+  if(!txHash){const labels={queued:'Đang chờ ghi nhận',processing:'Đang xử lý',submitted:'Đang chờ xác nhận',uncertain:'Cần kiểm tra xác nhận',blocked:'Chờ đối soát'};return '<span class=note>'+esc(labels[state]||'Chưa có minh chứng on-chain')+'</span>';}
   const s=esc(shortHash(txHash));
   return url?`<a href="${esc(url)}" target=_blank rel=noopener class=mono title="${esc(txHash)}">${s} </a>`:`<span class="badge nft mono" title="${esc(txHash)}">${s}</span>`;
 }
@@ -160,7 +160,7 @@ function renderHistory(rows){
       <td><span class=badge>${esc(labels[tx.type]||tx.type)}</span></td>
       <td><b style="color:${tx.amount>0?'var(--positive)':tx.amount<0?'var(--negative)':'inherit'}">${tx.amount>0?'+'+vnd(tx.amount):tx.amount<0?'-'+vnd(Math.abs(tx.amount)):'—'}</b></td>
       <td>${esc(tx.note)}</td>
-      <td>${txHtml(tx.tx_hash,tx.explorerUrl)}</td>
+      <td>${txHtml(tx.tx_hash,tx.explorerUrl,tx.chain_state)}</td>
     </tr>`).join('')}</tbody>
   </table></div>`;
 
@@ -177,7 +177,7 @@ function renderHistory(rows){
       <div class="hist-card-body">${esc(tx.note)}</div>
       <div class="hist-card-foot">
         <span class="hist-card-time"> ${esc(tx.at)}</span>
-        <div class="hist-card-tx">${txHtml(tx.tx_hash,tx.explorerUrl)}</div>
+        <div class="hist-card-tx">${txHtml(tx.tx_hash,tx.explorerUrl,tx.chain_state)}</div>
       </div>
     </div>`;
   }).join('')}</div>`;

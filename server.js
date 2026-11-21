@@ -590,7 +590,7 @@ route('post', 'buy', 'customer', async r => {
   await db.run('UPDATE events SET remain=remain-1 WHERE id=?', [eventId]);
   const ins = await db.run('INSERT INTO tickets(event,owner,orig,created_at) VALUES(?,?,?,CURRENT_TIMESTAMP)', [eventId, r.u.id, e.price]);
   const ticketId = Number(ins.lastInsertRowid);
-  const chainRes = await chain.onBuyPrimary(ticketId, r.u.wallet, e.id, e.price);
+  const chainRes = await chain.onBuyPrimary(ticketId, r.u.wallet, e.id, e.price, {historyIds:[buyerTxId,sellerTxId]});
   if (chainRes) {
     const contractAddr = chain.getStatus().avaTicketAddress;
     await db.run('UPDATE tickets SET token_id=?,tx_hash=?,contract_addr=? WHERE id=?', [chainRes.tokenId, chainRes.txHash, contractAddr, ticketId]);
@@ -663,7 +663,7 @@ route('post', 'buy-resale', 'customer', async r => {
   await db.run('UPDATE tickets SET owner=?,listed=NULL WHERE id=?', [r.u.id, ticketId]);
   let chainRes = null;
   if (isActiveContractTicket(t)) {
-    chainRes = await chain.onBuyResale(t.token_id, r.u.wallet, t.id);
+    chainRes = await chain.onBuyResale(t.token_id, r.u.wallet, t.id, {historyIds:[buyerTxId,sellerTxId]});
     if (chainRes?.txHash) {
       await db.run('UPDATE tickets SET tx_hash=? WHERE id=?', [chainRes.txHash, t.id]);
       await db.run('UPDATE txs SET tx_hash=? WHERE id IN (?,?)', [chainRes.txHash, buyerTxId, sellerTxId]);
@@ -716,7 +716,22 @@ const fmtVnTime = s => {
 };
 
 route('get', 'history', true, async r => {
-  const rows = await db.all("SELECT *, datetime(at, '+7 hours') AS at_vn FROM txs WHERE user=? ORDER BY id DESC LIMIT 50", [r.u.id]);
+  const rows = await db.all("SELECT txs.*, datetime(txs.at, '+7 hours') AS at_vn, j.state AS chain_state FROM txs LEFT JOIN chain_job_history h ON h.tx_id=txs.id LEFT JOIN chain_jobs j ON j.id=h.job_id WHERE txs.user=? ORDER BY txs.id DESC LIMIT 50", [r.u.id]);
+  // Compatibility for primary purchases created before explicit job/history links.
+  // Only attach evidence when event, exact time, amount, buyer wallet and job
+  // all identify a single candidate. Ambiguous history remains unverified.
+  for (const tx of rows) {
+    if (tx.tx_hash || tx.chain_state || tx.type !== 'buy') continue;
+    const candidates = await db.all("SELECT j.state,j.tx_hash,j.args FROM chain_jobs j JOIN tickets t ON t.id=j.ticket_id JOIN events e ON e.id=t.event WHERE j.action='onBuyPrimary' AND t.event=? AND t.created_at=? AND t.orig=? AND e.name=?",[tx.event_id,tx.at,-tx.amount,tx.note]);
+    const matching = candidates.filter(job => {
+      try { return String(JSON.parse(job.args)[1]).toLowerCase() === String(r.u.wallet).toLowerCase(); } catch { return false; }
+    });
+    const duplicates = await db.get("SELECT COUNT(*) n FROM txs WHERE user=? AND type='buy' AND event_id=? AND at=? AND amount=? AND note=?",[r.u.id,tx.event_id,tx.at,tx.amount,tx.note]);
+    if (matching.length === 1 && duplicates.n === 1) {
+      tx.chain_state=matching[0].state;
+      if (matching[0].state === 'confirmed') tx.tx_hash=matching[0].tx_hash;
+    }
+  }
   return rows.map(tx => ({
     ...tx,
     at: fmtVnTime(tx.at_vn || tx.at),

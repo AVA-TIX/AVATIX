@@ -3,15 +3,17 @@
 module.exports = (db, chain) => {
   const methods = ['onBuyPrimary','onListResale','onUnlistResale','onBuyResale','onScanTicket'];
   const original = Object.fromEntries(methods.map(name=>[name,chain[name].bind(chain)]));
-  const ready = db.run(`CREATE TABLE IF NOT EXISTS chain_jobs(
+  const ready = db.batch([{sql:`CREATE TABLE IF NOT EXISTS chain_jobs(
     id INTEGER PRIMARY KEY, ticket_id INTEGER NOT NULL, action TEXT NOT NULL,
     args TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'queued', tx_hash TEXT,
-    error TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)`);
+    error TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)`},{sql:`CREATE TABLE IF NOT EXISTS chain_job_history(job_id INTEGER NOT NULL,tx_id INTEGER PRIMARY KEY)`}]);
   for (const action of methods) chain[action] = async (...args) => {
     if (!chain.isEnabled()) return null;
     await ready;
+    const metadata = typeof args[args.length-1] === 'object' ? args.pop() : {};
     const ticketId = action === 'onBuyPrimary' ? args[0] : args.pop();
-    await db.run('INSERT INTO chain_jobs(ticket_id,action,args) VALUES(?,?,?)',[ticketId,action,JSON.stringify(args)]);
+    const inserted = await db.run('INSERT INTO chain_jobs(ticket_id,action,args) VALUES(?,?,?)',[ticketId,action,JSON.stringify(args)]);
+    for (const txId of metadata.historyIds || []) await db.run('INSERT INTO chain_job_history(job_id,tx_id) VALUES(?,?)',[inserted.lastInsertRowid,txId]);
     return null;
   };
   let busy = false;
@@ -42,6 +44,7 @@ module.exports = (db, chain) => {
         return;
       }
       await db.transaction(async () => {
+        await db.run('UPDATE txs SET tx_hash=? WHERE id IN (SELECT tx_id FROM chain_job_history WHERE job_id=?)',[result.txHash,job.id]);
         if (job.action === 'onBuyPrimary') await db.run('UPDATE tickets SET token_id=?,tx_hash=?,contract_addr=? WHERE id=?',[result.tokenId,result.txHash,chain.getStatus().avaTicketAddress,job.ticket_id]);
         else await db.run('UPDATE tickets SET tx_hash=? WHERE id=?',[result.txHash,job.ticket_id]);
         await db.run("UPDATE chain_jobs SET state='confirmed',tx_hash=?,error=NULL WHERE id=?",[result.txHash,job.id]);
