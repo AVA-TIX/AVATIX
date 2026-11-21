@@ -1,5 +1,5 @@
-<!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Đăng nhập</title><link rel=stylesheet href=style.css><link rel=stylesheet href=dark.css>
-<body class=auth><main class="card box"><h1 class=logo style="font-size:32px"><span>AVA</span>-TIX</h1><p class=note>Đăng nhập để mua và quản lý vé sự kiện.</p>
+<!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Đăng nhập</title><script src=theme.js></script><link rel=stylesheet href=style.css><link rel=stylesheet href=profile.css><link rel=stylesheet href=dark.css>
+<body class=auth><main class="card box"><div class="auth-heading"><h1 class=logo style="font-size:32px"><span>AVA</span>-TIX</h1><div class="site-nav"><button class="menu-toggle" id="menuToggle" type="button" aria-label="Mở menu" aria-expanded="false" aria-controls="accountMenu" onclick="toggleNavigation()"><span class="hamburger" aria-hidden="true"><i></i><i></i><i></i></span><span>Menu</span></button><nav class="menu-panel" id="accountMenu" aria-label="Tùy chọn giao diện" hidden><fieldset class="theme-switcher"><legend>Giao diện</legend><div class="theme-options"><button type="button" data-theme-choice="light" aria-pressed="false">Sáng</button><button type="button" data-theme-choice="dark" aria-pressed="true">Tối</button></div></fieldset></nav></div></div><p class=note>Đăng nhập để mua và quản lý vé sự kiện.</p>
 <div class=tabs style="margin-bottom:16px"><button id=tl class=on> Đăng nhập</button><button id=tr> Đăng ký</button></div><p id=msg class=note hidden></p>
 
 <div id=demoBox class="demo-box" style="margin-bottom:18px;padding:14px;border-radius:12px;background:rgba(255,56,92,0.06);border:1px dashed var(--tb-red)">
@@ -27,7 +27,7 @@
 </form>
 
 <form id=fr hidden>
-  <label>Loại tài khoản</label><div class=pay><label class=r><input type=radio name=role value=customer checked>Khách hàng</label><label class=r><input type=radio name=role value=organizer>Nhà cung cấp (BTC)</label></div>
+  <fieldset class=account-type><legend>Loại tài khoản</legend><div class=pay><label class=r><input type=radio name=role value=customer checked><span>Khách hàng</span></label><label class=r><input type=radio name=role value=organizer><span>Nhà cung cấp (BTC)</span></label></div></fieldset>
   <label for=ru>Tên đăng nhập (tối thiểu 8 ký tự)</label><input id=ru minlength=8 required>
   <label for=rp>Mật khẩu (tối thiểu 8 ký tự, 1 chữ in hoa, 1 số)</label><input id=rp type=password required>
   <label for=registerPin>Mã bảo mật riêng · 6 chữ số</label><input class=pin-entry id=registerPin type=password inputmode=numeric pattern="[0-9]{6}" minlength=6 maxlength=6 autocomplete=off required><label for=registerPinAgain>Nhập lại mã bảo mật</label><input class=pin-entry id=registerPinAgain type=password inputmode=numeric pattern="[0-9]{6}" minlength=6 maxlength=6 autocomplete=off required><label for=re>Email</label><input id=re type=email required>

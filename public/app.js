@@ -138,7 +138,7 @@ async function qr(id){
       if(qb) {
         qb.innerHTML = `<div style="padding:22px 14px;text-align:center">
           <div style="font-size:36px;margin-bottom:8px"></div>
-          <div style="font-weight:700;color:#f3a0a7;font-size:15px;margin-bottom:6px">Không thể tạo mã QR</div>
+          <div style="font-weight:700;color:var(--negative);font-size:15px;margin-bottom:6px">Không thể tạo mã QR</div>
           <div class="note" style="color:var(--text);font-size:13.5px">${esc(e.message)}</div>
         </div>`;
       }
@@ -159,7 +159,7 @@ function renderHistory(rows){
     <tbody>${rows.map(tx=>`<tr>
       <td>${esc(tx.at)}</td>
       <td><span class=badge>${esc(labels[tx.type]||tx.type)}</span></td>
-      <td><b style="color:${tx.amount>0?'#8fd5b0':tx.amount<0?'#f3a0a7':'inherit'}">${tx.amount>0?'+'+vnd(tx.amount):tx.amount<0?'-'+vnd(Math.abs(tx.amount)):'—'}</b></td>
+      <td><b style="color:${tx.amount>0?'var(--positive)':tx.amount<0?'var(--negative)':'inherit'}">${tx.amount>0?'+'+vnd(tx.amount):tx.amount<0?'-'+vnd(Math.abs(tx.amount)):'—'}</b></td>
       <td>${esc(tx.note)}</td>
       <td>${txHtml(tx.tx_hash,tx.explorerUrl)}</td>
     </tr>`).join('')}</tbody>
@@ -168,7 +168,7 @@ function renderHistory(rows){
   const mobileCards = `<div class="hist-mobile">${rows.map(tx=>{
     const isPlus = tx.amount > 0;
     const isMinus = tx.amount < 0;
-    const amtColor = isPlus ? '#8fd5b0' : isMinus ? '#f3a0a7' : 'var(--text-muted)';
+    const amtColor = isPlus ? 'var(--positive)' : isMinus ? 'var(--negative)' : 'var(--text-muted)';
     const amtText = isPlus ? '+'+vnd(tx.amount) : isMinus ? '-'+vnd(Math.abs(tx.amount)) : '—';
     return `<div class="hist-card">
       <div class="hist-card-head">
@@ -189,17 +189,19 @@ function renderTop(me,role){
   const links=role==='customer'?[['open','Khám phá sự kiện'],['mine','Vé của tôi'],['market','Chợ vé'],['history','Lịch sử on-chain']]:[['stats','Sự kiện của tôi'],['create','Tạo sự kiện'],['scan','Soát vé'],['history','Lịch sử on-chain']];
   $('#top').innerHTML=`
     <div class="top-brand"><a class="logo" href="/${role}.html" aria-label="AVA-TIX — Trang chủ"><span>AVA</span>-TIX</a><span class="brand-caption">${role==='customer'?'Vé cho những cuộc hẹn hay.':'Dành cho nhà tổ chức'}</span></div>
-    <div class="top-wallet"><span class="bal"><span class="bal-label">Số dư </span><b id="bal"></b></span><button class="btn sm btn-topup" onclick="topup()">Nạp tiền</button></div>
+    <div class="top-wallet"><span class="bal"><span class="bal-label">Số dư:</span> <b id="bal"></b></span><button class="btn sm btn-topup" onclick="topup()">Nạp tiền</button></div>
     <button class="account-shortcut" onclick="openSecurityModal()" aria-label="Tài khoản của ${esc(me.username)}">${avatarHtml(me)}<span>${esc(me.username)}</span></button>
     <div class="site-nav"><button class="menu-toggle" id="menuToggle" type="button" aria-label="Mở menu" aria-expanded="false" aria-controls="accountMenu" onclick="toggleNavigation()"><span class="hamburger" aria-hidden="true"><i></i><i></i><i></i></span><span>Menu</span></button>
       <nav class="menu-panel" id="accountMenu" aria-label="Điều hướng tài khoản" hidden>
         <div class="menu-user">${avatarHtml(me)}<div><b>${esc(me.username)}</b><span>${role==='customer'?'Khách hàng':'Nhà tổ chức'}</span></div></div>
         <button class="menu-link" onclick="navigateAccount()">Tài khoản</button>
         ${links.map(([key,label])=>`<button class="menu-link" data-section="${key}" onclick="selectNavigation('${key}')">${label}</button>`).join('')}
+        ${window.avatixTheme.controls()}
         <button class="menu-link menu-logout" onclick="logout()">Đăng xuất</button>
       </nav>
     </div>`;
   setBal(me);
+  window.avatixTheme.sync();
 }
 function avatarHtml(user,extra=''){
   const safeAvatar=/^data:image\/(?:webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(user.avatar||'');
