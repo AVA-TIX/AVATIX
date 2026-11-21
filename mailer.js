@@ -1,32 +1,46 @@
 /**
- * mailer.js — AVA-TIX Dual-mode Email / OTP Sender
- *
- * - Nếu .env có SMTP_USER & SMTP_PASS → gửi email thật qua Nodemailer (Gmail / SMTP bất kỳ).
- * - Nếu chưa cấu hình SMTP → chạy chế độ Dev/Demo: in mã OTP ra console và trả devOtp về UI để test ngay.
+ * OTP is sent only by a configured SMTP server. Codes are never returned to
+ * clients or written to logs, including when email is unavailable.
  */
 
 const nodemailer = require("nodemailer");
 
-let transporter = null;
+let transporter = null, transportKey = '';
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const serviceError = message => Object.assign(new Error(message), { c: 503 });
+
+function smtpConfig() {
+  const user = String(process.env.SMTP_USER || '').trim();
+  const pass = process.env.SMTP_PASS || '';
+  const host = process.env.SMTP_HOST || (/@(?:gmail|googlemail)\.com$/i.test(user) ? 'smtp.gmail.com' : '');
+  const port = Number(process.env.SMTP_PORT || 465);
+  const secure = process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : port === 465;
+  return { user, pass, host, port, secure };
+}
 
 function isSmtpConfigured() {
-  return Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
+  const { user, pass, host, port } = smtpConfig();
+  return Boolean(user && pass && host && Number.isInteger(port) && port > 0 && port <= 65535);
 }
 
 function getTransporter() {
-  if (transporter) return transporter;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const host = process.env.SMTP_HOST || (user.endsWith("@gmail.com") ? "smtp.gmail.com" : undefined);
-  const port = Number(process.env.SMTP_PORT || 465);
-  const secure = process.env.SMTP_SECURE ? process.env.SMTP_SECURE === "true" : port === 465;
+  const { user, pass, host, port, secure } = smtpConfig();
+  const nextKey = JSON.stringify([user, pass, host, port, secure]);
+  if (transporter && transportKey === nextKey) return transporter;
+  if (transporter?.close) transporter.close();
 
   transporter = nodemailer.createTransport({
     host,
     port,
     secure,
+    requireTLS: !secure,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+    tls: { minVersion: 'TLSv1.2' },
     auth: { user, pass },
   });
+  transportKey = nextKey;
   return transporter;
 }
 
@@ -55,21 +69,23 @@ const PURPOSE_META = {
 
 /**
  * Gửi mã OTP 6 số tới email người dùng
- * @returns {Promise<{mode: 'smtp'|'dev', devOtp?: string}>}
+ * @returns {Promise<{mode: 'smtp'}>}
  */
 async function sendOtpEmail({ to, username, code, purpose }) {
   const meta = PURPOSE_META[purpose] || PURPOSE_META.verify_email;
 
   if (!isSmtpConfigured()) {
-    console.log(`[Mailer][DEV-OTP] To: ${to} | User: ${username} | Purpose: ${purpose} | OTP: ${code}`);
-    return { mode: "dev", devOtp: code };
+    throw serviceError('Dịch vụ gửi email chưa được cấu hình. Vui lòng liên hệ quản trị viên.');
+  }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(to || '')) || !/^\d{6}$/.test(String(code || ''))) {
+    throw serviceError('Không thể gửi mã xác thực tới địa chỉ email này.');
   }
 
   const from = process.env.SMTP_FROM || `"AVA-TIX Security" <${process.env.SMTP_USER}>`;
   const html = `
-    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;border:2px solid #1d2b3a;border-radius:12px;background:#fff6e5;color:#1d2b3a">
+    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;border-top:4px solid #e84142;background:#fff;color:#171717">
       <h2 style="margin:0 0 8px">AVA-TIX · ${meta.title}</h2>
-      <p>Xin chào <b>${username}</b>,</p>
+      <p>Xin chào <b>${escapeHtml(username)}</b>,</p>
       <p>${meta.desc}</p>
       <div style="margin:20px 0;padding:16px;text-align:center;background:#fff;border:2px solid #1d2b3a;border-radius:10px;font-size:32px;font-weight:700;letter-spacing:8px">
         ${code}
@@ -78,15 +94,21 @@ async function sendOtpEmail({ to, username, code, purpose }) {
     </div>
   `;
 
-  await getTransporter().sendMail({
+  try {
+  const result = await getTransporter().sendMail({
     from,
     to,
     subject: meta.subject,
     text: `Xin chao ${username}, ma OTP cua ban la: ${code} (het han sau 5 phut).`,
     html,
   });
-
-  console.log(`[Mailer][SMTP] ✅ Đã gửi OTP (${purpose}) tới ${to}`);
+  if (!result.accepted?.some(address => String(address).toLowerCase() === String(to).toLowerCase())) {
+    throw new Error('Recipient rejected');
+  }
+  } catch {
+    // SMTP errors can include connection credentials and message contents.
+    throw serviceError('Chưa gửi được email xác thực. Vui lòng thử lại sau hoặc liên hệ quản trị viên.');
+  }
   return { mode: "smtp" };
 }
 

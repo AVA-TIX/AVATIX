@@ -102,7 +102,7 @@ async function _migrate(db) {
        username TEXT UNIQUE COLLATE NOCASE,
        hash TEXT, salt TEXT, email TEXT, phone TEXT,
        bank TEXT, role TEXT, cccd TEXT,
-       wallet TEXT, email_verified INTEGER DEFAULT 0,
+       wallet TEXT, avatar TEXT, email_verified INTEGER DEFAULT 0,
        balance INTEGER DEFAULT 0,
        session_desktop TEXT DEFAULT NULL,
        session_mobile TEXT DEFAULT NULL
@@ -142,6 +142,7 @@ async function _migrate(db) {
 
   // Migration an toàn: thêm cột mới vào bảng cũ
   const migrations = [
+    { check: `PRAGMA table_info(users)`,   col: 'avatar',          sql: `ALTER TABLE users   ADD COLUMN avatar TEXT` },
     { check: `PRAGMA table_info(users)`,   col: 'wallet',          sql: `ALTER TABLE users   ADD COLUMN wallet TEXT` },
     { check: `PRAGMA table_info(users)`,   col: 'email_verified',  sql: `ALTER TABLE users   ADD COLUMN email_verified INTEGER DEFAULT 0` },
     { check: `PRAGMA table_info(users)`,   col: 'session_desktop', sql: `ALTER TABLE users   ADD COLUMN session_desktop TEXT DEFAULT NULL` },

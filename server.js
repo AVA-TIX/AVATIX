@@ -5,9 +5,10 @@ const express = require('express'),
 const chain = require('./blockchain');
 const mailer = require('./mailer');
 const db = require('./db');  // ← dual-mode DB (Turso cloud hoặc SQLite local)
+const { normalizeAvatar, prepareAvatar } = require('./avatar');
 
 const app = express();
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '12mb' }));
 const SECRET = process.env.SECRET || 'avatix-dev-secret-doi-khi-deploy';
 const FEE = 0.05, CAP = 1.1, METHODS = ['momo', 'bank', 'vnpay', 'vietqr'];
 
@@ -130,7 +131,13 @@ const resolveResetUser = async identifier => {
   if (byEmail.length > 1) throw E('Email này dùng cho nhiều tài khoản. Vui lòng nhập chính xác Tên đăng nhập.');
   return byEmail[0];
 };
+const pendingOtp = new Set();
 async function issueOtp(user, purpose) {
+  if (!mailer.isSmtpConfigured()) throw E('Dịch vụ gửi email chưa được cấu hình. Vui lòng liên hệ quản trị viên.', 503);
+  const pendingKey = `${user.id}:${purpose}`;
+  if (pendingOtp.has(pendingKey)) throw E('Mã OTP đang được gửi. Vui lòng đợi trước khi thử lại.', 429);
+  pendingOtp.add(pendingKey);
+  try {
   const now = Date.now();
   const prev = await db.get('SELECT * FROM otps WHERE user_id=? AND purpose=? AND used=0 ORDER BY id DESC LIMIT 1', [user.id, purpose]);
   if (prev && now - prev.created_at < OTP_COOLDOWN) {
@@ -139,12 +146,18 @@ async function issueOtp(user, purpose) {
   }
   await db.run('UPDATE otps SET used=1 WHERE user_id=? AND purpose=? AND used=0', [user.id, purpose]);
   const code = String(crypto.randomInt(100000, 1000000));
-  await db.run(
-    'INSERT INTO otps(user_id,email,purpose,code_hash,expires_at,created_at) VALUES(?,?,?,?,?,?)',
+  const inserted = await db.run(
+    'INSERT INTO otps(user_id,email,purpose,code_hash,expires_at,created_at,used) VALUES(?,?,?,?,?,?,1)',
     [user.id, user.email, purpose, otpHash(user.id, purpose, code), now + OTP_TTL, now]
   );
-  const mail = await mailer.sendOtpEmail({ to: user.email, username: user.username, code, purpose });
-  return { ...mail, maskedEmail: maskEmail(user.email), expiresIn: 300 };
+  // A code becomes usable only after the mail server has accepted its message.
+  // Failed delivery leaves the pending row invalid, with no resend cooldown.
+  await mailer.sendOtpEmail({ to: user.email, username: user.username, code, purpose });
+  await db.run('UPDATE otps SET used=0 WHERE id=?', [inserted.lastInsertRowid]);
+  return { mode: 'smtp', maskedEmail: maskEmail(user.email), expiresIn: 300 };
+  } finally {
+    pendingOtp.delete(pendingKey);
+  }
 }
 async function verifyOtp(userId, purpose, rawCode) {
   const code = String(rawCode || '').trim();
@@ -156,15 +169,16 @@ async function verifyOtp(userId, purpose, rawCode) {
     throw E('Mã OTP đã hết hạn (quá 5 phút), vui lòng gửi lại mã mới');
   }
   if (otpHash(userId, purpose, code) !== row.code_hash) {
-    const nextAttempts = row.attempts + 1;
+    await db.run('UPDATE otps SET attempts=attempts+1, used=CASE WHEN attempts+1>=? THEN 1 ELSE used END WHERE id=? AND used=0', [OTP_MAX_ATTEMPTS, row.id]);
+    const latest = await db.get('SELECT attempts FROM otps WHERE id=?', [row.id]);
+    const nextAttempts = Number(latest.attempts);
     if (nextAttempts >= OTP_MAX_ATTEMPTS) {
-      await db.run('UPDATE otps SET attempts=?,used=1 WHERE id=?', [nextAttempts, row.id]);
       throw E('Nhập sai OTP quá 5 lần. Vui lòng yêu cầu mã OTP mới');
     }
-    await db.run('UPDATE otps SET attempts=? WHERE id=?', [nextAttempts, row.id]);
     throw E(`Mã OTP không chính xác (còn ${OTP_MAX_ATTEMPTS - nextAttempts} lần thử)`);
   }
-  await db.run('UPDATE otps SET used=1 WHERE id=?', [row.id]);
+  const consumed = await db.run('UPDATE otps SET used=1 WHERE id=? AND used=0 AND expires_at>=? AND attempts<?', [row.id, Date.now(), OTP_MAX_ATTEMPTS]);
+  if (Number(consumed.rowsAffected) !== 1) throw E('Mã OTP đã được sử dụng. Vui lòng gửi mã mới.');
 }
 
 // ─── Auth routes ─────────────────────────────────────────────────────────────
@@ -302,6 +316,22 @@ route('get', 'me', true, async r => {
   };
 });
 route('get', 'chain', 0, () => chain.getStatus());
+
+route('post', 'profile/avatar', true, async r => {
+  const avatar = await normalizeAvatar(r.body.avatar);
+  await db.run('UPDATE users SET avatar=? WHERE id=?', [avatar, r.u.id]);
+  return { ok: 1, avatar };
+});
+const preparingAvatars = new Set();
+route('post', 'profile/avatar/prepare', true, async r => {
+  if (preparingAvatars.has(r.u.id) || preparingAvatars.size >= 2) throw E('Ảnh đang được xử lý. Vui lòng thử lại sau ít giây.', 429);
+  preparingAvatars.add(r.u.id);
+  try {
+    return { image: await prepareAvatar(r.body.image) };
+  } finally {
+    preparingAvatars.delete(r.u.id);
+  }
+});
 
 // ─── Topup ────────────────────────────────────────────────────────────────────
 route('post', 'topup', true, async r => {

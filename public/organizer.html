@@ -1,5 +1,5 @@
-<!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Nhà tổ chức sự kiện (Organizer Portal)</title><link rel=stylesheet href=style.css><script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<body><header class=top id=top></header><main class=wrap><div class=tabs id=tabs></div><div id=body></div></main>
+<!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Nhà tổ chức sự kiện (Organizer Portal)</title><link rel=stylesheet href=style.css><link rel=stylesheet href=profile.css><script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<body class=organizer-page><header class=top id=top></header><main class=wrap><div class=page-heading><p class=eyebrow>Dành cho ban tổ chức</p><h1 id=pageTitle>Quản lý sự kiện</h1></div><div class=tabs id=tabs></div><div id=body></div></main>
 <footer class=site-footer>
   <div class=footer-wrap>
     <div class=footer-col>
@@ -24,13 +24,13 @@
       </ul>
     </div>
   </div>
-  <div class=footer-bottom>© 2026 AVA-TIX Platform. Organizer Management Portal. Secured by Avalanche Fuji.</div>
+  <div class=footer-bottom>&copy; 2026 AVA-TIX · Dự án UniHack Avalanche 2026</div>
 </footer>
 <script src=app.js></script><script>
 let tab='stats',st=[],hs=[],dailyStats={today:'',rows:[]};
 let showFilter='upcoming',chartMetric='rev',chartRange=14,selectedChartShowId=null,hiddenChartIds=new Set(),hoverDayIdx=null,singleHoverIdx=null;
 const CHART_COLORS=['#FF385C','#00B14F','#2563EB','#F59E0B','#8B5CF6','#EC4899','#06B6D4','#EA580C'];
-const T={stats:'Thống kê show diễn',create:'Tạo sự kiện mới',scan:'Soát vé tại cổng',history:'Lịch sử On-chain'};
+const T={stats:'Thống kê show diễn',create:'Tạo sự kiện mới',scan:'Soát vé tại cổng',history:'Lịch sử on-chain'};
 (async()=>{window.me=await init('organizer');if(me)load()})();
 async function load(){
  [st,dailyStats,hs]=await Promise.all([api('stats'),api('stats/daily'),api('history')]);
@@ -94,12 +94,15 @@ function parseDateBadge(dStr){
 
 function bannerTheme(name){
  const n=String(name||'').toLowerCase();
- if(n.includes('blockchain')||n.includes('web3')||n.includes('crypto'))return{cls:'crypto',icon:'⛓️',tag:'Web3 & Tech'};
- if(n.includes('indie')||n.includes('acoustic')||n.includes('thu'))return{cls:'indie',icon:'🎸',tag:'Indie & Acoustic'};
- return{cls:'music',icon:'🎵',tag:'Live Concert'};
+ if(n.includes('blockchain')||n.includes('web3')||n.includes('crypto'))return{cls:'crypto',icon:'',tag:'Web3 & Tech'};
+ if(n.includes('indie')||n.includes('acoustic')||n.includes('thu'))return{cls:'indie',icon:'',tag:'Indie & Acoustic'};
+ return{cls:'music',icon:'',tag:'Live Concert'};
 }
 
+window.navigateSection=function(section){if(!Object.hasOwn(T,section))return;tab=section;draw();window.scrollTo({top:0,behavior:'smooth'})};
 function draw(){
+ window.syncNavigation?.(tab);
+ $('#pageTitle').textContent=T[tab];
  if(tab!=='scan'&&typeof stopCamera==='function')stopCamera();
  $('#tabs').innerHTML=Object.entries(T).map(([k,v])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';draw()">${v}</button>`).join('');
  const b=$('#body');
@@ -145,7 +148,7 @@ function draw(){
   list();
  }else if(tab==='create'){
   b.innerHTML=`<form class=card id=f style="max-width:580px;margin:10px auto;padding:26px">
-   <h2>➕ Tạo sự kiện âm nhạc / Hội thảo mới</h2>
+   <h2> Tạo sự kiện âm nhạc / Hội thảo mới</h2>
    <label>Tên sự kiện</label><input id=n placeholder="Ví dụ: Đêm nhạc EDM Summer Fest 2026" required>
    <div class=row style="gap:14px">
     <div style="flex:1"><label>Ngày tổ chức</label><input id=d type=date min="${getTodayVn()}" required></div>
@@ -156,17 +159,17 @@ function draw(){
    <label>Ảnh đại diện / Poster sự kiện</label>
    <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
     <label class="btn sm" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin:0;padding:8px 14px">
-     📁 Tải ảnh lên
+      Tải ảnh lên
      <input type="file" id="filePick" accept="image/*" style="display:none" onchange="processFile(this.files[0],'#img',previewCreateCover)">
     </label>
     <span class=note style="margin:0">hoặc dán link URL bên dưới</span>
    </div>
    <input id=img placeholder="Dán link ảnh (https://...) hoặc bấm nút Tải ảnh ở trên" oninput="previewCreateCover(this.value)">
    <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
-    <button type="button" class="btn sm ghost" onclick="setCreatePreset('https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=900&q=80')">🎵 EDM Stage</button>
-    <button type="button" class="btn sm ghost" onclick="setCreatePreset('https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=900&q=80')">⛓️ Web3 Tech</button>
-    <button type="button" class="btn sm ghost" onclick="setCreatePreset('https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=900&q=80')">🎸 Indie Acoustic</button>
-    <button type="button" class="btn sm ghost" onclick="setCreatePreset('https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=900&q=80')">🎪 Music Fest</button>
+    <button type="button" class="btn sm ghost" onclick="setCreatePreset('https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=900&q=80')"> EDM Stage</button>
+    <button type="button" class="btn sm ghost" onclick="setCreatePreset('https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=900&q=80')"> Web3 Tech</button>
+    <button type="button" class="btn sm ghost" onclick="setCreatePreset('https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=900&q=80')"> Indie Acoustic</button>
+    <button type="button" class="btn sm ghost" onclick="setCreatePreset('https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=900&q=80')"> Music Fest</button>
    </div>
    <div id=createPreviewBox style="display:none;margin-top:10px;border-radius:12px;height:150px;background-size:cover;background-position:center;border:1px solid var(--border);position:relative">
     <span style="position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,0.7);color:#fff;padding:2px 8px;border-radius:4px;font-size:11px">Xem trước ảnh đại diện</span>
@@ -186,7 +189,7 @@ function draw(){
    </div>
    <label>Thông tin chi tiết sự kiện</label>
    <textarea id=desc rows=4 placeholder="Mô tả sự kiện, nghệ sĩ tham gia biểu diễn, lịch trình mở cổng, quy định check-in và quyền lợi vé..."></textarea>
-   <p class=note>💡 Hệ thống tự động ghi nhận vé lên Smart Contract. Phí sàn 5% trên mỗi vé bán ra.</p>
+   <p class=note> Hệ thống tự động ghi nhận vé lên Smart Contract. Phí sàn 5% trên mỗi vé bán ra.</p>
    <button class=btn style="width:100%;margin-top:14px;padding:12px">Đăng sự kiện lên AVA-TIX</button>
   </form>`;
   $('#f').onsubmit=create;
@@ -201,7 +204,7 @@ function draw(){
        <button class="btn ghost red" id=btnCamStop style="display:none;padding:12px;font-size:14px">Tắt Camera</button>
      </div>
      <div id=camReader style="display:none;margin-top:12px;border-radius:12px;overflow:hidden;border:2px solid var(--tb-green);background:#000"></div>
-     <div id=camStatus class=note style="font-size:12px;text-align:center;margin-top:6px">💡 Hướng camera vào màn hình mã QR động của khán giả</div>
+     <div id=camStatus class=note style="font-size:12px;text-align:center;margin-top:6px"> Hướng camera vào màn hình mã QR động của khán giả</div>
    </div>
 
    <div style="position:relative;text-align:center;margin:18px 0">
@@ -211,7 +214,7 @@ function draw(){
 
    <label>Nội dung mã QR vé</label>
    <input id=tk placeholder="AVATIX|ticketId|owner|window|signature" style="font-family:ui-monospace,monospace;font-size:13px">
-   <div class=row style="margin-top:14px"><button class=btn id=sc style="width:100%;padding:12px">🔍 Kiểm tra &amp; Check-in vé</button></div>
+   <div class=row style="margin-top:14px"><button class=btn id=sc style="width:100%;padding:12px"> Kiểm tra &amp; Check-in vé</button></div>
    <div id=res class=note style="margin-top:14px"></div>
   </div>`;
   $('#sc').onclick=()=>scan();
@@ -252,7 +255,7 @@ function renderMultiChartCard(){
  const box=$('#multiChartBox');if(!box)return;
  const validShows=st.filter(e=>e.status!=='cancelled');
  if(!validShows.length){
-  box.innerHTML=`<div class=chart-card><div class=chart-head><div><h3>📈 Biểu đồ tăng trưởng theo ngày (Toàn bộ các show)</h3><p class=chart-sub>Chưa có show hiệu lực để thống kê biểu đồ theo ngày.</p></div></div></div>`;
+  box.innerHTML=`<div class=chart-card><div class=chart-head><div><h3> Biểu đồ tăng trưởng theo ngày (Toàn bộ các show)</h3><p class=chart-sub>Chưa có show hiệu lực để thống kê biểu đồ theo ngày.</p></div></div></div>`;
   return;
  }
  const legendHtml=validShows.map(e=>{
@@ -267,13 +270,13 @@ function renderMultiChartCard(){
  box.innerHTML=`<div class=chart-card>
   <div class=chart-head>
    <div>
-    <h3>📈 Biểu đồ tăng trưởng theo ngày (So sánh các show)</h3>
+    <h3> Biểu đồ tăng trưởng theo ngày (So sánh các show)</h3>
     <p class=chart-sub>Mỗi đường là 1 show diễn. Rê chuột hoặc chạm vào từng ngày để xem đồng thời <b>số vé bán</b> &amp; <b>doanh thu (95%)</b>.</p>
    </div>
    <div class=chart-controls>
     <div class=seg-group>
-     <button type=button class="seg-btn ${chartMetric==='rev'?'on':''}" onclick="setChartMetric('rev')">💵 Doanh thu</button>
-     <button type=button class="seg-btn ${chartMetric==='qty'?'on':''}" onclick="setChartMetric('qty')">🎟️ Số vé</button>
+     <button type=button class="seg-btn ${chartMetric==='rev'?'on':''}" onclick="setChartMetric('rev')"> Doanh thu</button>
+     <button type=button class="seg-btn ${chartMetric==='qty'?'on':''}" onclick="setChartMetric('qty')"> Số vé</button>
     </div>
     <div class=seg-group>
      <button type=button class="seg-btn ${chartRange===7?'on':''}" onclick="setChartRange(7)">7 ngày</button>
@@ -355,7 +358,7 @@ function renderMultiSvgOnly(){
   const pctLeft=(xAt(hoverDayIdx)/W)*100;
   const alignRight=pctLeft>60;
   tooltipHtml=`<div class=chart-tooltip style="left:${pctLeft}%;transform:translateX(${alignRight?'-104%':'10px'})">
-   <div class=chart-tooltip-head>📅 Ngày ${dmy(dayStr)}</div>
+   <div class=chart-tooltip-head> Ngày ${dmy(dayStr)}</div>
    ${activeShows.map(e=>{
     const r=dMap.get(e.id)?.get(dayStr)||{qty:0,revenue:0};
     return `<div class=chart-tooltip-row>
@@ -412,7 +415,7 @@ function renderSingleShowCard(){
   const pctLeft=((padL+step*singleHoverIdx+step/2)/W)*100;
   const alignRight=pctLeft>62;
   singleTooltip=`<div class=chart-tooltip style="left:${pctLeft}%;transform:translateX(${alignRight?'-104%':'10px'})">
-   <div class=chart-tooltip-head>📅 ${dmy(pt.day)} · ${esc(s.name)}</div>
+   <div class=chart-tooltip-head> ${dmy(pt.day)} · ${esc(s.name)}</div>
    <div class=chart-tooltip-row><span>Số vé bán được:</span><b>${pt.qty} vé</b></div>
    <div class=chart-tooltip-row><span>Doanh thu (95%):</span><b style="color:var(--tb-green)">${vnd(pt.revenue)}</b></div>
   </div>`;
@@ -423,7 +426,7 @@ function renderSingleShowCard(){
   <div class=chart-head>
    <div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-     <h3>📊 Thống kê &amp; Biểu đồ chi tiết từng show</h3>${badge}
+     <h3> Thống kê &amp; Biểu đồ chi tiết từng show</h3>${badge}
     </div>
     <p class=chart-sub>Theo dõi lượng vé bán và doanh thu mỗi ngày cho riêng từng sự kiện.</p>
    </div>
@@ -461,9 +464,9 @@ function renderFilterPills(){
  const cPast=st.filter(e=>classifyShow(e)==='past').length;
  const cCan=st.filter(e=>classifyShow(e)==='cancelled').length;
  const tabs=[
-  {k:'upcoming',label:`🔥 Sắp diễn ra (Đang bán vé) · ${cUp}`},
-  {k:'past',label:`✅ Đã diễn ra · ${cPast}`},
-  {k:'cancelled',label:`❌ Đã hủy · ${cCan}`}
+  {k:'upcoming',label:` Sắp diễn ra (Đang bán vé) · ${cUp}`},
+  {k:'past',label:` Đã diễn ra · ${cPast}`},
+  {k:'cancelled',label:` Đã hủy · ${cCan}`}
  ];
  box.innerHTML=tabs.map(t=>`<button type=button class="filter-pill ${showFilter===t.k?'on':''}" onclick="setShowFilter('${t.k}')">${t.label}</button>`).join('');
 }
@@ -476,9 +479,9 @@ function list(){
   const th=bannerTheme(e.name),db=parseDateBadge(e.date),imgUrl=getEventImg(e);
   const cls=classifyShow(e),isCancelled=cls==='cancelled',isPast=cls==='past';
   const tagHtml = isCancelled
-    ? '<span class="poster-tag out" style="background:#ef4444">❌ ĐÃ HỦY SHOW</span>'
+    ? '<span class="poster-tag out" style="background:#ef4444"> ĐÃ HỦY SHOW</span>'
     : isPast
-      ? '<span class="poster-tag" style="background:#475569">✅ ĐÃ DIỄN RA</span>'
+      ? '<span class="poster-tag" style="background:#475569"> ĐÃ DIỄN RA</span>'
       : `<span class="poster-tag ${e.remain>0?'':'out'}">${e.remain>0?`Còn ${e.remain}/${e.total} vé`:'SOLD OUT'}</span>`;
 
   return `<article class=card style="${isCancelled?'opacity:0.92;border-color:#fca5a5':''}">
@@ -489,15 +492,15 @@ function list(){
      <div class=day>${db.d}</div>
     </div>
     ${tagHtml}
-    <span class=event-poster-genre>${th.icon} ${th.tag}</span>
+    <span class=event-poster-genre>${th.tag}</span>
    </div>
    <div class=card-content>
     <h3>${esc(e.name)}</h3>
     <div class=event-details>
-     <div class=event-details-row>📅 <span>${dmy(e.date)}</span></div>
-     <div class=event-details-row>📍 <span>${esc(e.venue)}</span></div>
-     ${e.max_per_user>0?`<div class=event-details-row>🔒 <span>Giới hạn: <b>Tối đa ${e.max_per_user} vé/tài khoản</b></span></div>`:''}
-     ${isCancelled?`<div class=event-details-row><span style="color:#ef4444;font-weight:600">🚫 Show đã hủy · Hoàn tiền 100% cho khán giả</span></div>`:''}
+     <div class=event-details-row> <span>${dmy(e.date)}</span></div>
+     <div class=event-details-row> <span>${esc(e.venue)}</span></div>
+     ${e.max_per_user>0?`<div class=event-details-row> <span>Giới hạn: <b>Tối đa ${e.max_per_user} vé/tài khoản</b></span></div>`:''}
+     ${isCancelled?`<div class=event-details-row><span style="color:#ef4444;font-weight:600"> Show đã hủy · Hoàn tiền 100% cho khán giả</span></div>`:''}
     </div>
     <div class=card-action-bar style="border-top:none;padding-top:4px">
      <div class=price-block>
@@ -522,14 +525,14 @@ function list(){
     <div class=card-action-bar style="margin-top:12px;gap:6px;flex-wrap:wrap">
      ${isCancelled
        ? `<button class="btn sm ghost" style="flex:1" onclick="viewOrgDetail(${e.id})">Chi tiết</button>
-          <button class="btn sm" onclick="focusShowChart(${e.id})">📊 Biểu đồ</button>`
+          <button class="btn sm" onclick="focusShowChart(${e.id})"> Biểu đồ</button>`
        : isPast
-         ? `<button class="btn sm ghost" style="flex:1" onclick="viewOrgDetail(${e.id})">👁️ Chi tiết</button>
-            <button class="btn sm" onclick="focusShowChart(${e.id})">📊 Biểu đồ</button>`
-         : `<button class="btn sm ghost" style="flex:1" onclick="viewOrgDetail(${e.id})">👁️ Chi tiết</button>
-            <button class="btn sm" onclick="focusShowChart(${e.id})" title="Xem biểu đồ doanh thu show này">📊 Biểu đồ</button>
+         ? `<button class="btn sm ghost" style="flex:1" onclick="viewOrgDetail(${e.id})">Chi tiết</button>
+            <button class="btn sm" onclick="focusShowChart(${e.id})"> Biểu đồ</button>`
+         : `<button class="btn sm ghost" style="flex:1" onclick="viewOrgDetail(${e.id})">Chi tiết</button>
+            <button class="btn sm" onclick="focusShowChart(${e.id})" title="Xem biểu đồ doanh thu show này"> Biểu đồ</button>
             <button class="btn sm ghost" onclick="changeCoverModal(${e.id})" title="Đổi ảnh đại diện">Đổi ảnh</button>
-            <button class="btn sm ghost red" onclick="confirmCancelShow(${e.id})" title="Hủy show và tự động hoàn tiền vào ví người mua">🚫 Hủy</button>`
+            <button class="btn sm ghost red" onclick="confirmCancelShow(${e.id})" title="Hủy show và tự động hoàn tiền vào ví người mua"> Hủy</button>`
      }
     </div>
    </div>
@@ -545,7 +548,7 @@ function viewOrgDetail(id){
   <div class="modal-banner" style="background-image:linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.8) 100%), url('${esc(imgUrl)}')">
    <div class=modal-banner-tag>Show của bạn · ID #${e.id}</div>
   </div>
-  <h2>${esc(e.name)} ${isCancelled?'<span class="badge out">❌ Đã hủy show</span>':isPast?'<span class=badge>✅ Đã diễn ra</span>':''}</h2>
+  <h2>${esc(e.name)} ${isCancelled?'<span class="badge out"> Đã hủy show</span>':isPast?'<span class=badge> Đã diễn ra</span>':''}</h2>
   <table class=info>
    <tr><th>Trạng thái</th><td>${isCancelled?'<b style="color:#ef4444">Đã hủy show (Đã hoàn 100% tiền vé cho khán giả)</b>':isPast?'<span class=badge>Đã diễn ra</span>':'<span class="badge ok">Đang mở bán</span>'}</td></tr>
    <tr><th>Ngày tổ chức</th><td>${dmy(e.date)}</td></tr>
@@ -564,17 +567,17 @@ function viewOrgDetail(id){
   </div>
   <div class=row style="gap:8px">
    <button class="btn ghost" onclick=closeModal()>Đóng</button>
-   <button class="btn sm" onclick="closeModal();focusShowChart(${e.id})">📊 Biểu đồ</button>
+   <button class="btn sm" onclick="closeModal();focusShowChart(${e.id})"> Biểu đồ</button>
    ${isCancelled||isPast?'':`<button class="btn sm ghost" onclick="changeCoverModal(${e.id})">Đổi ảnh</button>
-   <button class="btn sm red" onclick="confirmCancelShow(${e.id})">🚫 Hủy show &amp; Hoàn tiền</button>`}
+   <button class="btn sm red" onclick="confirmCancelShow(${e.id})"> Hủy show &amp; Hoàn tiền</button>`}
   </div>`);
 }
 
 function confirmCancelShow(id){
  const e = st.find(x => x.id === id); if(!e) return;
- openModal(`<h2>🚫 Xác nhận HỦY SHOW DIỄN</h2>
+ openModal(`<h2> Xác nhận HỦY SHOW DIỄN</h2>
   <div style="background:rgba(239,68,68,0.08);border:1px solid #ef4444;border-radius:12px;padding:16px;margin:14px 0">
-   <b style="color:#ef4444;font-size:16px">⚠️ CẢNH BÁO QUAN TRỌNG:</b>
+   <b style="color:#ef4444;font-size:16px"> CẢNH BÁO QUAN TRỌNG:</b>
    <p style="margin:8px 0 0;font-size:14px;line-height:1.6">
     Hành động hủy show là <b>không thể hoàn tác</b>. Khi xác nhận:<br>
     • Hệ thống tự động kích hoạt Escrow hoàn <b>100% tiền vé</b> về ví của tất cả khán giả đã mua.<br>
@@ -590,7 +593,7 @@ function confirmCancelShow(id){
   </table>
   <div class=row style="margin-top:20px">
    <button class="btn ghost" onclick=closeModal()>Quay lại</button>
-   <button class="btn red" id=btnDoCancel onclick="doCancelShow(${e.id})">🚨 Xác nhận Hủy show &amp; Hoàn tiền ngay</button>
+   <button class="btn red" id=btnDoCancel onclick="doCancelShow(${e.id})"> Xác nhận Hủy show &amp; Hoàn tiền ngay</button>
   </div>`);
 }
 
@@ -604,7 +607,7 @@ async function doCancelShow(id){
   load();
  }catch(x){
   toast(x.message, 1);
-  if(btn){ btn.disabled = false; btn.textContent = '🚨 Xác nhận Hủy show & Hoàn tiền ngay'; }
+  if(btn){ btn.disabled = false; btn.textContent = ' Xác nhận Hủy show & Hoàn tiền ngay'; }
  }
 }
 
@@ -624,22 +627,22 @@ function changeCoverModal(id){
   <label>Ảnh đại diện / Poster</label>
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
    <label class="btn sm" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin:0;padding:8px 14px">
-    📁 Chọn ảnh từ thiết bị
+     Chọn ảnh từ thiết bị
     <input type="file" id="modalFilePick" accept="image/*" style="display:none" onchange="processFile(this.files[0],'#newCoverUrl',previewCoverModal)">
    </label>
    <span class=note style="margin:0">hoặc dán link bên dưới</span>
   </div>
   <input id=newCoverUrl value="${esc(curImg)}" placeholder="Dán link ảnh (https://...) hoặc bấm nút Chọn ảnh ở trên" oninput="previewCoverModal(this.value)">
   <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
-   <button type="button" class="btn sm ghost" onclick="setPresetCover('https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=900&q=80')">🎵 EDM Stage</button>
-   <button type="button" class="btn sm ghost" onclick="setPresetCover('https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=900&q=80')">⛓️ Web3 Tech</button>
-   <button type="button" class="btn sm ghost" onclick="setPresetCover('https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=900&q=80')">🎸 Indie Acoustic</button>
-   <button type="button" class="btn sm ghost" onclick="setPresetCover('https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=900&q=80')">🎪 Music Fest</button>
+   <button type="button" class="btn sm ghost" onclick="setPresetCover('https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=900&q=80')"> EDM Stage</button>
+   <button type="button" class="btn sm ghost" onclick="setPresetCover('https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=900&q=80')"> Web3 Tech</button>
+   <button type="button" class="btn sm ghost" onclick="setPresetCover('https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=900&q=80')"> Indie Acoustic</button>
+   <button type="button" class="btn sm ghost" onclick="setPresetCover('https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=900&q=80')"> Music Fest</button>
   </div>
   <div id=coverPreviewBox style="margin-top:12px;border-radius:12px;height:150px;background-size:cover;background-position:center;border:1px solid var(--border);${curImg?`background-image:url('${esc(curImg)}')`:'display:none'}"></div>
   <div class=row style="margin-top:16px">
    <button class="btn ghost" onclick=closeModal()>Hủy</button>
-   <button class=btn onclick="saveCover(${e.id})">💾 Lưu thay đổi</button>
+   <button class=btn onclick="saveCover(${e.id})"> Lưu thay đổi</button>
   </div>`);
 }
 function processFile(file, targetInputSelector, previewFn){
@@ -754,7 +757,7 @@ async function startCamera(){
  box.style.display = 'block';
  if(btnStart) btnStart.style.display = 'none';
  if(btnStop) btnStop.style.display = 'block';
- if(status) status.innerHTML = '🎥 <b>Camera đang bật.</b> Đưa mã QR của khán giả vào khung hình...';
+ if(status) status.innerHTML = ' <b>Camera đang bật.</b> Đưa mã QR của khán giả vào khung hình...';
 
  try{
   if(!html5QrScanner){
@@ -769,7 +772,7 @@ async function startCamera(){
     isScanningActive = false;
     playSuccessBeep();
     if($('#tk')) $('#tk').value = decodedText;
-    toast('🔍 Đã nhận mã QR, đang xác thực...');
+    toast(' Đã nhận mã QR, đang xác thực...');
     await scan(decodedText);
     setTimeout(() => {
      if(html5QrScanner && html5QrScanner.isScanning){
@@ -780,7 +783,7 @@ async function startCamera(){
    () => {}
   );
  }catch(err){
-  if(status) status.textContent = '⚠️ Không thể mở camera: ' + (err.message || err);
+  if(status) status.textContent = ' Không thể mở camera: ' + (err.message || err);
   if(btnStart) btnStart.style.display = 'block';
   if(btnStop) btnStop.style.display = 'none';
   box.style.display = 'none';
@@ -797,7 +800,7 @@ async function stopCamera(){
  if(box) box.style.display = 'none';
  if(btnStart) btnStart.style.display = 'block';
  if(btnStop) btnStop.style.display = 'none';
- if(status) status.textContent = '💡 Camera đã tắt.';
+ if(status) status.textContent = ' Camera đã tắt.';
 }
 
 async function scan(tokenParam){
@@ -807,15 +810,15 @@ async function scan(tokenParam){
  try{
   const r = await api('scan', { token });
   $('#res').className = 'note good';
-  $('#res').innerHTML = `<b>✅ XÁC THỰC THÀNH CÔNG</b><br>${esc(r.msg)}` + (r.txHash ? `<br>Minh chứng On-chain: ${txHtml(r.txHash, r.explorerUrl)}` : '');
-  toast('✅ Check-in thành công!');
+  $('#res').innerHTML = `<b> XÁC THỰC THÀNH CÔNG</b><br>${esc(r.msg)}` + (r.txHash ? `<br>Minh chứng On-chain: ${txHtml(r.txHash, r.explorerUrl)}` : '');
+  toast(' Check-in thành công!');
   load();
  }catch(x){
   $('#res').className = 'note err';
-  $('#res').innerHTML = `<b>❌ CHECK-IN THẤT BẠI:</b> ${esc(x.message)}`;
+  $('#res').innerHTML = `<b> CHECK-IN THẤT BẠI:</b> ${esc(x.message)}`;
   toast(x.message, 1);
  }finally{
-  if($('#sc')){ $('#sc').disabled = false; $('#sc').textContent = '🔍 Kiểm tra & Check-in vé'; }
+  if($('#sc')){ $('#sc').disabled = false; $('#sc').textContent = ' Kiểm tra & Check-in vé'; }
  }
 }
 </script>

@@ -14,8 +14,19 @@ async function api(u,b){
   return d;
 }
 function toast(t,bad){const e=document.createElement('div');e.id='toast';e.className=bad?'bad':'';e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),3600)}
-function openModal(h){$('#m').innerHTML='<div class="mb">'+h+'</div>';$('#m').hidden=false}
-function closeModal(){$('#m').hidden=true;$('#m').innerHTML='';clearInterval(window.tm)}
+let modalCleanup=null,modalReturnFocus=null;
+function openModal(h){
+  if(modalCleanup){modalCleanup();modalCleanup=null}
+  if($('#m').hidden)modalReturnFocus=document.activeElement;
+  $('#m').innerHTML='<div class="mb" role="dialog" aria-modal="true" aria-label="'+(h.match(/<h2[^>]*>([^<]+)/)?.[1]||'AVA-TIX')+'" tabindex="-1">'+h+'</div>';
+  $('#m').hidden=false;
+  $('#m .mb').focus();
+}
+function closeModal(){
+  if(modalCleanup){modalCleanup();modalCleanup=null}
+  $('#m').hidden=true;$('#m').innerHTML='';clearInterval(window.tm);
+  if(modalReturnFocus?.isConnected)modalReturnFocus.focus();
+}
 function openTermsModal(){
   let tm = $('#termsModal');
   if(!tm){
@@ -59,16 +70,25 @@ document.addEventListener('keydown', e => {
   if(e.key === 'Escape'){
     const tm = $('#termsModal');
     if(tm && !tm.hidden) closeTermsModal();
+    else if($('#m')&&!$('#m').hidden)closeModal();
+    else closeNavigation();
+  }
+  const dialog=$('#m:not([hidden]) .mb');
+  if(e.key==='Tab'&&dialog){
+    const items=[...dialog.querySelectorAll('button:not([disabled]),input:not([disabled]),a[href],select,[tabindex="0"]')].filter(el=>el.getClientRects().length);
+    if(!items.length){e.preventDefault();return}
+    if(e.shiftKey&&(document.activeElement===items[0]||document.activeElement===dialog)){e.preventDefault();items.at(-1).focus()}
+    else if(!e.shiftKey&&(document.activeElement===items.at(-1)||document.activeElement===dialog)){e.preventDefault();items[0].focus()}
   }
 });
 function txHtml(txHash,url){
   if(!txHash)return '<span class=note>Off-chain</span>';
   const s=esc(shortHash(txHash));
-  return url?`<a href="${esc(url)}" target=_blank rel=noopener class=mono title="${esc(txHash)}">${s} ↗</a>`:`<span class="badge nft mono" title="${esc(txHash)}">${s}</span>`;
+  return url?`<a href="${esc(url)}" target=_blank rel=noopener class=mono title="${esc(txHash)}">${s} </a>`:`<span class="badge nft mono" title="${esc(txHash)}">${s}</span>`;
 }
 function showChainInfo(){
   const me=window.me||{};const c=me.chain||{};
-  const link=(addr,url)=>addr?(url?`<a href="${esc(url)}" target=_blank rel=noopener class=mono>${esc(addr)} ↗</a>`:`<span class=mono>${esc(addr)}</span>`):'<i>Chưa deploy</i>';
+  const link=(addr,url)=>addr?(url?`<a href="${esc(url)}" target=_blank rel=noopener class=mono>${esc(addr)} </a>`:`<span class=mono>${esc(addr)}</span>`):'<i>Chưa deploy</i>';
   openModal(`<h2>Trạng thái Smart Contract</h2>
     <table class=info>
       <tr><th>Mạng</th><td><b>${esc(c.networkName||'Off-chain')}</b>${c.chainId?` (Chain ID: ${c.chainId})`:''}</td></tr>
@@ -83,7 +103,7 @@ function showChainInfo(){
 }
 function qr(id){
   openModal(`<h2>Mã QR vào cổng</h2>
-    <div class=qrbox id=qb><div style="padding:22px;color:var(--text-muted)">⏳ Đang tạo mã QR động...</div></div>
+    <div class=qrbox id=qb><div style="padding:22px;color:var(--text-muted)"> Đang tạo mã QR động...</div></div>
     <p class="note" id=cd style="text-align:center"></p>
     <div class=row><input id=qt readonly class=mono style="flex:1"><button class="btn sm ghost" id=cp>Copy mã</button></div>
     <p class=note>Mã tự đổi mỗi 20 giây. Ảnh chụp màn hình sẽ hết hạn.</p>
@@ -108,7 +128,7 @@ function qr(id){
       const qb = $('#qb');
       if(qb) {
         qb.innerHTML = `<div style="padding:22px 14px;text-align:center">
-          <div style="font-size:36px;margin-bottom:8px">⚠️</div>
+          <div style="font-size:36px;margin-bottom:8px"></div>
           <div style="font-weight:700;color:#dc2626;font-size:15px;margin-bottom:6px">Không thể tạo mã QR</div>
           <div class="note" style="color:var(--text);font-size:13.5px">${esc(e.message)}</div>
         </div>`;
@@ -120,7 +140,7 @@ function qr(id){
   g();
 }
 function renderHistory(rows){
-  const labels={topup:'💰 Nạp tiền',buy:'🎟️ Mua vé',sale:'💵 Bán vé',list:'🔄 Đăng bán lại',scan:'📷 Soát vé',refund:'↩️ Hoàn tiền',verify_email:'✉️ Xác thực Email',security:'🔐 Bảo mật / Đổi MK'};
+  const labels={topup:' Nạp tiền',buy:' Mua vé',sale:' Bán vé',list:' Đăng bán lại',scan:' Soát vé',refund:' Hoàn tiền',verify_email:' Xác thực Email',security:' Bảo mật / Đổi MK'};
   if(!rows.length)return '<div class="card empty">Chưa có giao dịch nào trong lịch sử.</div>';
   
   const desktopTable = `<div class="card tbl-wrap hist-desktop"><table class=hist>
@@ -146,7 +166,7 @@ function renderHistory(rows){
       </div>
       <div class="hist-card-body">${esc(tx.note)}</div>
       <div class="hist-card-foot">
-        <span class="hist-card-time">🕒 ${esc(tx.at)}</span>
+        <span class="hist-card-time"> ${esc(tx.at)}</span>
         <div class="hist-card-tx">${txHtml(tx.tx_hash,tx.explorerUrl)}</div>
       </div>
     </div>`;
@@ -155,51 +175,63 @@ function renderHistory(rows){
   return desktopTable + mobileCards;
 }
 function renderTop(me,role){
-  const c=me.chain||{};
-  const pill=c.enabled?`⛓️ ${esc(c.networkName)}`:'⛓️ Off-chain';
-  const secBtn=me.emailVerified
-    ?`<button class="chain-pill on top-sec-btn" onclick=openSecurityModal() title="Email đã xác thực · Đổi mật khẩu"><span class=sec-icon>🛡️</span><span class=sec-text> Bảo mật</span></button>`
-    :`<button class="chain-pill warn top-sec-btn" onclick=openSecurityModal() title="Xác thực email & Đổi mật khẩu"><span class=sec-icon>⚠️</span><span class=sec-text> Xác thực</span></button>`;
-  const firstLetter = (me.username || 'U')[0].toUpperCase();
-  const roleBadge = role === 'organizer' ? 'ORGANIZER' : 'WEB3';
-  const roleLabel = role === 'customer' ? 'Khách' : 'BTC';
-
+  const links=role==='customer'?[['open','Khám phá sự kiện'],['mine','Vé của tôi'],['market','Chợ vé'],['history','Lịch sử on-chain']]:[['stats','Sự kiện của tôi'],['create','Tạo sự kiện'],['scan','Soát vé'],['history','Lịch sử on-chain']];
   $('#top').innerHTML=`
-    <div class="top-row-1">
-      <div class="top-brand">
-        <div class="logo" onclick="location.reload()">
-          <span>AVA</span>-TIX <small>${roleBadge}</small>
-        </div>
-        <button class="chain-pill ${c.enabled?'on':'off'}" onclick="showChainInfo()" title="Xem thông tin Smart Contract Avalanche">${pill}</button>
-      </div>
-      <div class="top-quick-actions">
-        ${secBtn}
-        <button class="btn ghost sm btn-logout" onclick="logout()" title="Đăng xuất">Đăng xuất</button>
-      </div>
-    </div>
-    <div class="top-row-2">
-      <div class="top-user" title="Tài khoản ${role==='customer'?'Khách hàng':'Nhà tổ chức'}">
-        <span class="avatar">${firstLetter}</span>
-        <span class="top-user-name"><b>${esc(me.username)}</b> <small style="color:#64748b">(${roleLabel})</small></span>
-      </div>
-      <div class="top-wallet">
-        <div class="bal" onclick="topup()" title="Bấm để nạp tiền"><span>💰</span> <span class="bal-label">Ví: </span><span id="bal"></span></div>
-        <button class="btn green sm btn-topup" onclick="topup()">+ <span class="topup-text">Nạp tiền</span></button>
-      </div>
+    <div class="top-brand"><a class="logo" href="/${role}.html" aria-label="AVA-TIX — Trang chủ"><span>AVA</span>-TIX</a><span class="brand-caption">${role==='customer'?'Vé cho những cuộc hẹn hay.':'Dành cho nhà tổ chức'}</span></div>
+    <div class="top-wallet"><span class="bal"><span class="bal-label">Số dư </span><b id="bal"></b></span><button class="btn sm btn-topup" onclick="topup()">Nạp tiền</button></div>
+    <button class="account-shortcut" onclick="openSecurityModal()" aria-label="Tài khoản của ${esc(me.username)}">${avatarHtml(me)}<span>${esc(me.username)}</span></button>
+    <div class="site-nav"><button class="menu-toggle" id="menuToggle" type="button" aria-label="Mở menu" aria-expanded="false" aria-controls="accountMenu" onclick="toggleNavigation()"><span class="hamburger" aria-hidden="true"><i></i><i></i><i></i></span><span>Menu</span></button>
+      <nav class="menu-panel" id="accountMenu" aria-label="Điều hướng tài khoản" hidden>
+        <div class="menu-user">${avatarHtml(me)}<div><b>${esc(me.username)}</b><span>${role==='customer'?'Khách hàng':'Nhà tổ chức'}</span></div></div>
+        <button class="menu-link" onclick="navigateAccount()">Tài khoản</button>
+        ${links.map(([key,label])=>`<button class="menu-link" data-section="${key}" onclick="selectNavigation('${key}')">${label}</button>`).join('')}
+        <button class="menu-link menu-logout" onclick="logout()">Đăng xuất</button>
+      </nav>
     </div>`;
   setBal(me);
 }
+function avatarHtml(user,extra=''){
+  const safeAvatar=/^data:image\/(?:webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(user.avatar||'');
+  return `<span class="avatar ${extra}">${safeAvatar?`<img src="${user.avatar}" alt="">`:esc((user.username||'U')[0].toUpperCase())}</span>`;
+}
+function toggleNavigation(){
+  const panel=$('#accountMenu'),button=$('#menuToggle');
+  if(!panel.hidden){closeNavigation();return}
+  panel.hidden=false;button.setAttribute('aria-expanded','true');button.setAttribute('aria-label','Đóng menu');
+  panel.querySelector('button').focus();
+}
+function closeNavigation(returnFocus=true){
+  const panel=$('#accountMenu'),button=$('#menuToggle');
+  if(!panel||panel.hidden)return;
+  panel.hidden=true;button.setAttribute('aria-expanded','false');button.setAttribute('aria-label','Mở menu');
+  if(returnFocus)button.focus();
+}
+function navigateAccount(){closeNavigation();openSecurityModal()}
+function selectNavigation(section){closeNavigation();window.navigateSection?.(section)}
+window.syncNavigation=section=>document.querySelectorAll('[data-section]').forEach(el=>{
+  if(el.dataset.section===section)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');
+});
+document.addEventListener('click',e=>{if(!e.target.closest('.site-nav'))closeNavigation(false)});
+document.addEventListener('focusin',e=>{if(!e.target.closest('.site-nav'))closeNavigation(false)});
+document.addEventListener('keydown',e=>{
+  const panel=$('#accountMenu');if(!panel||panel.hidden)return;
+  const links=[...panel.querySelectorAll('button')],index=links.indexOf(document.activeElement);
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();links[(index+(e.key==='ArrowDown'?1:links.length-1))%links.length].focus()}
+  if(e.key==='Home'){e.preventDefault();links[0].focus()}
+  if(e.key==='End'){e.preventDefault();links.at(-1).focus()}
+});
 function openSecurityModal(){
   const me=window.me||{};
   const role=me.role;
-  const devName = me.currentDevice === 'mobile' ? '📱 Điện thoại di động' : '💻 Máy tính (PC / Laptop)';
+  const devName = me.currentDevice === 'mobile' ? ' Điện thoại di động' : ' Máy tính (PC / Laptop)';
   const activeSess = me.activeSessions || {};
   const activeList = [
-    activeSess.desktop ? '💻 1 Máy tính' : null,
-    activeSess.mobile  ? '📱 1 Điện thoại' : null
+    activeSess.desktop ? ' 1 Máy tính' : null,
+    activeSess.mobile  ? ' 1 Điện thoại' : null
   ].filter(Boolean).join(' + ') || '1 thiết bị';
 
-  openModal(`<h2>Tài khoản &amp; Bảo mật</h2>
+  openModal(`<h2>Tài khoản</h2>
+    <div class="profile-summary">${avatarHtml(me,'profile-avatar')}<div><b>${esc(me.username)}</b><p class="note">Ảnh đại diện của bạn trên AVA-TIX</p><button class="btn ghost sm" onclick="openAvatarEditor()">Thay ảnh đại diện</button></div></div>
     <table class=info>
       <tr><th>Tên đăng nhập</th><td><b>${esc(me.username)}</b></td></tr>
       <tr><th>Email</th><td>${esc(me.email)} ${me.emailVerified?'<span class="badge nft">Đã xác thực</span>':'<span class="badge out">Chưa xác thực</span>'}</td></tr>
@@ -208,7 +240,7 @@ function openSecurityModal(){
       <tr><th>Phiên đang mở</th><td><span style="font-weight:600;color:var(--tb-green)">${esc(activeList)}</span></td></tr>
     </table>
     <p class="note" style="margin:10px 0 14px;background:rgba(0,177,79,0.06);padding:10px 14px;border-radius:10px;border:1px solid rgba(0,177,79,0.2)">
-      💡 <b>Cơ chế chống gian lận &amp; chia sẻ tài khoản:</b> Hệ thống cho phép duy nhất <b>1 phiên PC</b> và <b>1 phiên Điện thoại</b> cùng lúc. Nếu có thiết bị thứ 2 cùng loại đăng nhập, thiết bị cũ sẽ tự động đăng xuất ngay lập tức để bảo vệ vé của bạn.
+       <b>Cơ chế chống gian lận &amp; chia sẻ tài khoản:</b> Hệ thống cho phép duy nhất <b>1 phiên PC</b> và <b>1 phiên Điện thoại</b> cùng lúc. Nếu có thiết bị thứ 2 cùng loại đăng nhập, thiết bị cũ sẽ tự động đăng xuất ngay lập tức để bảo vệ vé của bạn.
     </p>
     ${me.emailVerified?'':`
       <div class=sec-box>
@@ -235,7 +267,7 @@ function openSecurityModal(){
         <label>Xác nhận mật khẩu mới</label><input id=cpNew2 type=password autocomplete=new-password>
         <div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button><button class=btn id=cpOk>Đổi mật khẩu</button></div>
       `:`
-        <p class=note err>🔒 Vui lòng xác thực Email ở trên trước khi đổi mật khẩu.</p>
+        <p class=note err> Vui lòng xác thực Email ở trên trước khi đổi mật khẩu.</p>
         <div class=row><button class="btn ghost" onclick=closeModal()>Đóng</button></div>
       `}
     </div>`);
@@ -244,7 +276,7 @@ function openSecurityModal(){
     $('#evSend').onclick=async()=>{
       try{
         const r=await api('verify-email/request',{});
-        $('#evBox').innerHTML=r.devOtp?`<div class=dev-otp><b>[Dev Mode]</b> Mã OTP mẫu: <b class=mono>${esc(r.devOtp)}</b> (hiệu lực 5 phút)</div>`:`<p class="note good">Đã gửi OTP tới ${esc(r.maskedEmail)}</p>`;
+        $('#evBox').innerHTML=`<p class="note good">Đã gửi OTP tới ${esc(r.maskedEmail)}. Kiểm tra cả mục thư rác.</p>`;
         toast('Đã gửi mã OTP xác thực email');
       }catch(e){toast(e.message,1)}
     };
@@ -262,7 +294,7 @@ function openSecurityModal(){
     $('#cpSend').onclick=async()=>{
       try{
         const r=await api('change-password/request',{currentPassword:$('#cpOld').value});
-        $('#cpBox').innerHTML=r.devOtp?`<div class=dev-otp><b>[Dev Mode]</b> Mã OTP đổi MK: <b class=mono>${esc(r.devOtp)}</b></div>`:`<p class="note good">Đã gửi OTP tới ${esc(r.maskedEmail)}</p>`;
+        $('#cpBox').innerHTML=`<p class="note good">Đã gửi OTP tới ${esc(r.maskedEmail)}. Mã có hiệu lực 5 phút.</p>`;
         toast('Đã gửi OTP xác nhận đổi mật khẩu');
       }catch(e){toast(e.message,1)}
     };
@@ -289,6 +321,83 @@ async function init(role){
 }
 const setBal=m=>$('#bal').textContent=vnd(m.balance);
 async function logout(){await api('logout',{});location='/login.html'}
+function openAvatarEditor(){
+  openModal(`<h2>Ảnh đại diện</h2><p class="note">Chọn ảnh từ thiết bị, kéo để căn vị trí và điều chỉnh độ phóng trước khi lưu.</p>
+    <label class="avatar-file-label" for="avatarFile">Chọn ảnh từ thiết bị</label>
+    <input id="avatarFile" class="avatar-file" type="file" accept="image/*,.heic,.heif,.tif,.tiff,.avif,.bmp,.ico">
+    <p class="note avatar-formats">JPG, PNG, WebP, GIF, AVIF, SVG, BMP, HEIC/HEIF, TIFF · Tối đa 8 MB. Ảnh động dùng một khung hình.</p>
+    <div id="avatarStatus" class="note" role="status" aria-live="polite">Chưa chọn ảnh.</div>
+    <div id="avatarControls" hidden>
+      <div class="avatar-crop"><canvas id="avatarCanvas" width="512" height="512" tabindex="0" aria-label="Khung cắt ảnh vuông. Kéo ảnh hoặc dùng các phím mũi tên để căn vị trí."></canvas><span class="avatar-crop-guide" aria-hidden="true"></span></div>
+      <label for="avatarZoom">Phóng to / thu nhỏ <output id="avatarZoomValue" for="avatarZoom">100%</output></label>
+      <div class="avatar-zoom-row"><button type="button" class="btn ghost sm" id="avatarZoomOut" aria-label="Thu nhỏ ảnh">−</button><input id="avatarZoom" type="range" min="1" max="4" step="0.01" value="1"><button type="button" class="btn ghost sm" id="avatarZoomIn" aria-label="Phóng to ảnh">+</button></div>
+      <p class="note">Khung tỉ lệ 1:1. Vùng tròn là phần ảnh hiển thị trên tài khoản.</p>
+    </div>
+    <div class="row avatar-actions"><button class="btn ghost" id="avatarCancel">Quay lại</button>${window.me.avatar?'<button class="btn ghost" id="avatarRemove">Xóa ảnh</button>':''}<button class="btn" id="avatarSave" disabled>Lưu ảnh</button></div>`);
+  const canvas=$('#avatarCanvas'),ctx=canvas.getContext('2d'),fileInput=$('#avatarFile'),zoomInput=$('#avatarZoom'),save=$('#avatarSave'),status=$('#avatarStatus');
+  let image=null,url=null,epoch=0,zoom=1,offsetX=0,offsetY=0,drag=null,busy=false;
+  const active=()=>canvas.isConnected;
+  modalCleanup=()=>{epoch++;if(url)URL.revokeObjectURL(url);image=null};
+  function draw(){
+    if(!image||!active())return;
+    const scale=Math.max(512/image.naturalWidth,512/image.naturalHeight)*zoom,w=image.naturalWidth*scale,h=image.naturalHeight*scale;
+    offsetX=Math.max(-(w-512)/2,Math.min((w-512)/2,offsetX));
+    offsetY=Math.max(-(h-512)/2,Math.min((h-512)/2,offsetY));
+    ctx.clearRect(0,0,512,512);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,512,512);
+    ctx.drawImage(image,(512-w)/2+offsetX,(512-h)/2+offsetY,w,h);
+    $('#avatarZoomValue').textContent=Math.round(zoom*100)+'%';
+  }
+  function setZoom(value){if(busy)return;zoom=Math.max(1,Math.min(4,Number(value)));zoomInput.value=zoom;draw()}
+  const readFile=file=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Không đọc được ảnh. Hãy thử chọn lại.'));reader.readAsDataURL(file)});
+  const loadImage=src=>new Promise((resolve,reject)=>{const candidate=new Image();candidate.onload=()=>resolve(candidate);candidate.onerror=()=>reject(new Error('Không đọc được định dạng ảnh này.'));candidate.src=src});
+  fileInput.onchange=async()=>{
+    const file=fileInput.files[0];if(!file)return;
+    const ticket=++epoch;save.disabled=true;$('#avatarControls').hidden=true;image=null;
+    status.className='note';status.textContent='Đang đọc ảnh…';
+    try{
+      if(file.size>8*1024*1024)throw new Error('Ảnh vượt quá 8 MB. Vui lòng chọn ảnh nhỏ hơn.');
+      if(!file.type.startsWith('image/')&&!/\.(jpe?g|png|webp|gif|avif|svg|bmp|ico|heic|heif|tiff?)$/i.test(file.name))throw new Error('Vui lòng chọn một tệp ảnh.');
+      if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(file);
+      let loaded;
+      try{loaded=await loadImage(url)}catch{
+        if(ticket!==epoch||!active())return;
+        status.textContent='Đang chuyển đổi ảnh…';
+        let original=await readFile(file);
+        if(!file.type.startsWith('image/'))original=original.replace(/^data:[^;]*;/,'data:image/'+(/\.hei[cf]$/i.test(file.name)?'heic':/\.tiff?$/i.test(file.name)?'tiff':'octet-stream')+';');
+        const prepared=await api('profile/avatar/prepare',{image:original});
+        loaded=await loadImage(prepared.image);
+      }
+      if(ticket!==epoch||!active())return;
+      if(!loaded.naturalWidth||loaded.naturalWidth*loaded.naturalHeight>40*1000*1000)throw new Error('Ảnh quá lớn. Vui lòng dùng ảnh dưới 40 megapixel.');
+      image=loaded;zoom=1;offsetX=offsetY=0;zoomInput.value='1';
+      $('#avatarControls').hidden=false;save.disabled=false;draw();status.textContent='Ảnh đã sẵn sàng. Căn khung rồi chọn Lưu ảnh.';
+    }catch(e){if(ticket===epoch&&active()){status.textContent=e.message;status.className='note err'}}
+    finally{if(ticket===epoch&&active())fileInput.value=''}
+  };
+  zoomInput.oninput=()=>setZoom(zoomInput.value);
+  $('#avatarZoomOut').onclick=()=>setZoom(zoom-.1);$('#avatarZoomIn').onclick=()=>setZoom(zoom+.1);
+  canvas.onpointerdown=e=>{if(!image||busy)return;drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId)};
+  canvas.onpointermove=e=>{if(!drag||busy)return;const ratio=512/canvas.getBoundingClientRect().width;offsetX+=(e.clientX-drag.x)*ratio;offsetY+=(e.clientY-drag.y)*ratio;drag={x:e.clientX,y:e.clientY};draw()};
+  canvas.onpointerup=canvas.onpointercancel=()=>{drag=null};
+  canvas.onkeydown=e=>{
+    if(!image||busy||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;
+    e.preventDefault();offsetX+=e.key==='ArrowLeft'?-10:e.key==='ArrowRight'?10:0;offsetY+=e.key==='ArrowUp'?-10:e.key==='ArrowDown'?10:0;draw();
+  };
+  $('#avatarCancel').onclick=()=>openSecurityModal();
+  async function persist(avatar){
+    busy=true;save.disabled=true;fileInput.disabled=true;$('#avatarCancel').disabled=true;status.className='note';status.textContent='Đang lưu ảnh…';
+    const remove=$('#avatarRemove');if(remove)remove.disabled=true;
+    try{
+      const result=await api('profile/avatar',{avatar});
+      window.me.avatar=result.avatar;renderTop(window.me,window.me.role);
+      if(typeof tab==='string')window.syncNavigation(tab);
+      if(active()){openSecurityModal();toast(avatar?'Đã cập nhật ảnh đại diện':'Đã xóa ảnh đại diện')}
+    }catch(e){if(active()){status.textContent=e.message;status.className='note err'}}
+    finally{busy=false;if(active()){save.disabled=!image;fileInput.disabled=false;$('#avatarCancel').disabled=false;if(remove)remove.disabled=false}}
+  }
+  save.onclick=()=>{if(image&&!busy)persist(canvas.toDataURL('image/png'))};
+  if($('#avatarRemove'))$('#avatarRemove').onclick=()=>{if(!busy)persist(null)};
+}
 function topup(){
   openModal(`<h2>Nạp tiền vào ví</h2><label>Số tiền (VNĐ)</label><input id=amt inputmode=numeric placeholder="Ví dụ: 500.000" oninput=money(this)><p class=note>Tối thiểu 10.000đ. Dấu chấm tự động phân tách hàng nghìn.</p>
   <label>Phương thức thanh toán</label><div class=pay>${[['momo','Ví MoMo'],['bank','Ngân hàng'],['vnpay','VNPAY'],['vietqr','VietQR']].map(([v,t],i)=>`<label class=r><input type=radio name=pm value=${v} ${i?'':'checked'}>${t}</label>`).join('')}</div>
@@ -298,10 +407,10 @@ function topup(){
 function bannerTheme(name){
   const n=String(name||'').toLowerCase();
   if(n.includes('blockchain')||n.includes('web3')||n.includes('crypto'))
-    return {cls:'crypto',icon:'⛓️',tag:'Web3 & Tech',fallbackImg:'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=900&q=80'};
+    return {cls:'crypto',icon:'',tag:'Web3 & Tech',fallbackImg:'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=900&q=80'};
   if(n.includes('indie')||n.includes('acoustic')||n.includes('thu'))
-    return {cls:'indie',icon:'🎸',tag:'Indie & Acoustic',fallbackImg:'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=900&q=80'};
-  return {cls:'music',icon:'🎵',tag:'Live Concert',fallbackImg:'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=900&q=80'};
+    return {cls:'indie',icon:'',tag:'Indie & Acoustic',fallbackImg:'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=900&q=80'};
+  return {cls:'music',icon:'',tag:'Live Concert',fallbackImg:'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=900&q=80'};
 }
 function getEventImg(item){
   if(item && item.image && item.image.trim()) return item.image.trim();
