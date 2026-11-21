@@ -238,6 +238,7 @@ function confirmBuy(path,body,id,src){
  const maxPerUser=o.max_per_user||0;
  const eventId=src==='open'?o.id:o.event;
  const myTicketCount=eventId?tk.filter(t=>t.event===eventId&&t.used!=2).length:0;
+ const isDemoBypass=Boolean(me.demoOtpBypass);
  openModal(`<h2>Xác nhận mua vé</h2>
   <table class=info>
    <tr><th>Sự kiện</th><td><b>${esc(o.name)}</b></td></tr>
@@ -252,17 +253,29 @@ function confirmBuy(path,body,id,src){
    <tr><th>Số dư ví</th><td>${vnd(me.balance)} ${hasEnoughBal?'':`<span class="note err">(Thiếu ${vnd(price-me.balance)})</span>`}</td></tr>
   </table>
   ${hasEnoughBal?'':`<p class="note err"> Số dư ví không đủ. Vui lòng Nạp tiền trước khi mua.</p>`}
-  <p class=note>Vui lòng kiểm tra thông tin. Sau khi bấm xác nhận, hệ thống sẽ gửi mã OTP về email của bạn để xác thực thanh toán.</p>
+  ${isDemoBypass
+    ? `<div class="dev-otp" style="margin:10px 0"><b>⚡ Chế độ Demo Giám khảo:</b> Tài khoản mẫu được miễn bước OTP email khi mua vé. Tài khoản thật vẫn bắt buộc xác thực OTP qua email.</div>`
+    : `<p class=note>Vui lòng kiểm tra thông tin. Sau khi bấm xác nhận, hệ thống sẽ gửi mã OTP về email của bạn để xác thực thanh toán.</p>`}
   <div class=chk><input type=checkbox id=ag onchange="$('#ok').disabled=!this.checked||!${hasEnoughBal}"><span>Tôi đã đọc, hiểu và cam kết với <span class=tip><a href="#" onclick="openTermsModal();return false">điều khoản và chính sách</a><a class=pop href="#" onclick="openTermsModal();return false">Xem Điều khoản &amp; Chính sách</a></span> của AVA-TIX.</span></div>
-  <div class=row><button class="btn ghost" onclick=closeModal()>Hủy</button><button id=ok class=btn disabled>${hasEnoughBal?'Xác nhận &amp; Gửi mã OTP':'Số dư không đủ'}</button></div>`);
+  <div class=row><button class="btn ghost" onclick=closeModal()>Hủy</button><button id=ok class=btn disabled>${hasEnoughBal?(isDemoBypass?'Xác nhận &amp; Thanh toán ngay':'Xác nhận &amp; Gửi mã OTP'):'Số dư không đủ'}</button></div>`);
 
  $('#ok').onclick=async()=>{
-  $('#ok').disabled=true;$('#ok').textContent='Đang gửi mã OTP...';
+  $('#ok').disabled=true;$('#ok').textContent=isDemoBypass?'Đang xử lý thanh toán...':'Đang gửi mã OTP...';
   try{
+   if(isDemoBypass){
+    const res=await api(path,{...body});
+    closeModal();
+    toast(res.txHash?`Mua vé thành công! (On-chain: ${shortHash(res.txHash)})`:'Mua vé thành công!');
+    window.me=await api('me');
+    setBal(window.me);
+    tab='mine';
+    await load();
+    return;
+   }
    const otpRes=await api('buy/request-otp',{});
    renderOtpStep(path,body,o,price,otpRes);
   }catch(e){
-   $('#ok').disabled=false;$('#ok').textContent='Xác nhận & Gửi mã OTP';
+   $('#ok').disabled=false;$('#ok').textContent=isDemoBypass?'Xác nhận & Thanh toán ngay':'Xác nhận & Gửi mã OTP';
    toast(e.message,1);
   }
  };

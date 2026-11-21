@@ -86,6 +86,8 @@ const log = async (u, t, a, n, txHash = null, eventId = null) => {
 // ─── OTP ─────────────────────────────────────────────────────────────────────
 const PASS_RE = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
 const OTP_TTL = 5 * 60 * 1000, OTP_COOLDOWN = 30 * 1000, OTP_MAX_ATTEMPTS = 5;
+const DEMO_BYPASS_USERS = new Set(['demo_customer', 'demo_organizer']);
+const isDemoOtpBypass = u => (process.env.DEMO_OTP_BYPASS === '1' || process.env.DEMO_OTP_BYPASS === 'true') && Boolean(u && DEMO_BYPASS_USERS.has(String(u.username || '').toLowerCase()));
 const otpHash = (uid, purpose, code) => sign(`${uid}|${purpose}|${code}`);
 const maskEmail = e => {
   const [n, d] = String(e || '').split('@');
@@ -306,6 +308,7 @@ route('get', 'me', true, async r => {
     ...u,
     emailVerified: Boolean(r.u.email_verified),
     smtpEnabled: mailer.isSmtpConfigured(),
+    demoOtpBypass: isDemoOtpBypass(r.u),
     chainEnabled: chain.isEnabled(),
     chain: chain.getStatus(),
     currentDevice: currentDev,
@@ -463,14 +466,19 @@ const isActiveContractTicket = t => t && t.token_id && chain.isEnabled() &&
 
 // ─── Buy (Primary) & Buy OTP ──────────────────────────────────────────────────
 route('post', 'buy/request-otp', 'customer', async r => {
+  if (isDemoOtpBypass(r.u)) {
+    return { ok: 1, bypass: true, maskedEmail: maskEmail(r.u.email) };
+  }
   const res = await issueOtp(r.u, 'buy_ticket');
   return { ok: 1, ...res };
 });
 
 route('post', 'buy', 'customer', async r => {
-  const code = String(r.body.code || '').trim();
-  if (!code) throw E('Vui lòng nhập mã OTP để xác nhận mua vé');
-  await verifyOtp(r.u.id, 'buy_ticket', code);
+  if (!isDemoOtpBypass(r.u)) {
+    const code = String(r.body.code || '').trim();
+    if (!code) throw E('Vui lòng nhập mã OTP để xác nhận mua vé');
+    await verifyOtp(r.u.id, 'buy_ticket', code);
+  }
 
   const eventId = +r.body.event;
   const e = await db.get('SELECT * FROM events WHERE id=?', [eventId]);
@@ -539,9 +547,11 @@ route('get', 'market', 'customer', () => db.all(
 
 // ─── Buy Resale ───────────────────────────────────────────────────────────────
 route('post', 'buy-resale', 'customer', async r => {
-  const code = String(r.body.code || '').trim();
-  if (!code) throw E('Vui lòng nhập mã OTP để xác nhận mua lại vé');
-  await verifyOtp(r.u.id, 'buy_ticket', code);
+  if (!isDemoOtpBypass(r.u)) {
+    const code = String(r.body.code || '').trim();
+    if (!code) throw E('Vui lòng nhập mã OTP để xác nhận mua lại vé');
+    await verifyOtp(r.u.id, 'buy_ticket', code);
+  }
 
   const ticketId = +r.body.ticket;
   const t = await db.get('SELECT t.*,e.name,e.status event_status,e.max_per_user FROM tickets t JOIN events e ON e.id=t.event WHERE t.id=? AND t.listed IS NOT NULL AND t.used=0', [ticketId]);

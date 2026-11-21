@@ -131,6 +131,30 @@ test('account avatar and email-only OTP API', async t => {
       assert.deepEqual(responses.map(r => r.status).sort(), [200, 400]);
       assert.equal((await request('forgot-password/confirm', { identifier: 'otp_tester', code, newPassword: 'Newpass3' }, false)).status, 400);
     });
+    await t.test('DEMO_OTP_BYPASS applies strictly to demo accounts when enabled', async () => {
+      const prevBypass = process.env.DEMO_OTP_BYPASS;
+      try {
+        delete process.env.DEMO_OTP_BYPASS;
+        await login('demo_customer');
+        assert.equal((await request('me')).body.demoOtpBypass, false);
+        assert.equal((await request('buy', { event: 1 })).status, 400);
+
+        process.env.DEMO_OTP_BYPASS = '1';
+        assert.equal((await request('me')).body.demoOtpBypass, true);
+        const bypassReq = await request('buy/request-otp', {});
+        assert.equal(bypassReq.status, 200);
+        assert.equal(bypassReq.body.bypass, true);
+        assert.equal((await request('buy', { event: 1 })).status, 200);
+
+        // Real registered user still cannot bypass OTP even when DEMO_OTP_BYPASS=1
+        assert.equal((await request('register', { username: 'real_user_check', password: 'Testpass1', email: 'realcheck@example.com', phone: '0901234569', bank: 'VCB - 1234567890', role: 'customer' }, false)).status, 200);
+        await login('real_user_check', 'Testpass1');
+        assert.equal((await request('me')).body.demoOtpBypass, false);
+        assert.equal((await request('buy', { event: 1 })).status, 400);
+      } finally {
+        prevBypass === undefined ? delete process.env.DEMO_OTP_BYPASS : (process.env.DEMO_OTP_BYPASS = prevBypass);
+      }
+    });
   } finally {
     mailer.sendOtpEmail = originalSend;
     mailer.isSmtpConfigured = originalConfigured;
