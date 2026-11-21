@@ -148,7 +148,8 @@ function draw(){
   renderFilterPills();
   list();
  }else if(tab==='create'){
-  b.innerHTML=`<form class=card id=f style="max-width:580px;margin:10px auto;padding:26px">
+  const isPendingOrg = window.me?.status === 'pending';
+  b.innerHTML=`${isPendingOrg ? `<div class="card" style="max-width:580px;margin:0 auto 14px;padding:16px;border-color:var(--warning-text);background:var(--warning-bg);color:var(--warning-text)"><b>⏳ Tài khoản đang chờ Admin duyệt CCCD:</b> Bạn chỉ có thể phát hành sự kiện mới sau khi quản trị viên xác minh và duyệt tài khoản Nhà tổ chức.</div>` : ''}<form class=card id=f style="max-width:580px;margin:10px auto;padding:26px">
    <h2> Tạo sự kiện âm nhạc / Hội thảo mới</h2>
    <label>Tên sự kiện</label><input id=n placeholder="Ví dụ: Đêm nhạc EDM Summer Fest 2026" required>
    <div class=row style="gap:14px">

@@ -187,14 +187,20 @@ function renderHistory(rows){
 function renderTop(me,role){
   const c=me.chain||{};
   const pill=c.enabled?(c.chainId===43113?'⛓️ Avalanche Fuji':'⛓️ '+esc(c.networkName)):'⛓️ Off-chain';
-  const links=role==='customer'?[['open','Khám phá sự kiện'],['mine','Vé của tôi'],['market','Chợ vé'],['history','Lịch sử on-chain']]:[['stats','Sự kiện của tôi'],['create','Tạo sự kiện'],['scan','Soát vé'],['history','Lịch sử on-chain']];
+  const links=role==='customer'
+    ?[['open','Khám phá sự kiện'],['mine','Vé của tôi'],['market','Chợ vé'],['history','Lịch sử on-chain']]
+    :role==='organizer'
+      ?[['stats','Sự kiện của tôi'],['create','Tạo sự kiện'],['scan','Soát vé'],['history','Lịch sử on-chain']]
+      :[['overview','Tổng quan sàn'],['users','Users & BTC'],['events','Tất cả Show diễn']];
+  const caption=role==='customer'?'Vé cho những cuộc hẹn hay.':role==='organizer'?'Dành cho nhà tổ chức':'Quản trị hệ thống';
+  const roleName=role==='customer'?'Khách hàng':role==='organizer'?'Nhà tổ chức':'Quản trị viên (Admin)';
   $('#top').innerHTML=`
-    <div class="top-brand"><a class="logo" href="/${role}.html" aria-label="AVA-TIX — Trang chủ"><span>AVA</span>-TIX</a><span class="brand-caption">${role==='customer'?'Vé cho những cuộc hẹn hay.':'Dành cho nhà tổ chức'}</span><button type="button" class="chain-pill ${c.enabled?'on':'off'}" onclick="showChainInfo()" title="Xem trạng thái Smart Contract Avalanche">${pill}</button></div>
-    <div class="top-wallet"><span class="bal"><span class="bal-label">Số dư:</span> <b id="bal"></b></span><button class="btn sm btn-topup" onclick="topup()">Nạp tiền</button></div>
+    <div class="top-brand"><a class="logo" href="/${role}.html" aria-label="AVA-TIX — Trang chủ"><span>AVA</span>-TIX</a><span class="brand-caption">${caption}</span><button type="button" class="chain-pill ${c.enabled?'on':'off'}" onclick="showChainInfo()" title="Xem trạng thái Smart Contract Avalanche">${pill}</button></div>
+    ${role==='admin'?'':`<div class="top-wallet"><span class="bal"><span class="bal-label">Số dư:</span> <b id="bal"></b></span><button class="btn sm btn-topup" onclick="topup()">Nạp tiền</button></div>`}
     <button class="account-shortcut" onclick="openSecurityModal()" aria-label="Tài khoản của ${esc(me.username)}">${avatarHtml(me)}<span>${esc(me.username)}</span></button>
     <div class="site-nav"><button class="menu-toggle" id="menuToggle" type="button" aria-label="Mở menu" aria-expanded="false" aria-controls="accountMenu" onclick="toggleNavigation()"><span class="hamburger" aria-hidden="true"><i></i><i></i><i></i></span><span>Menu</span></button>
       <nav class="menu-panel" id="accountMenu" aria-label="Điều hướng tài khoản" hidden>
-        <div class="menu-user">${avatarHtml(me)}<div><b>${esc(me.username)}</b><span>${role==='customer'?'Khách hàng':'Nhà tổ chức'}</span></div></div>
+        <div class="menu-user">${avatarHtml(me)}<div><b>${esc(me.username)}</b><span>${roleName}</span></div></div>
         <button class="menu-link" onclick="navigateAccount()">Tài khoản</button>
         ${links.map(([key,label])=>`<button class="menu-link" data-section="${key}" onclick="selectNavigation('${key}')">${label}</button>`).join('')}
         <button class="menu-link" onclick="closeNavigation(false);showChainInfo()">Smart Contract (${c.enabled?'On-chain':'Off-chain'})</button>
@@ -245,7 +251,7 @@ async function init(role){
     return me;
   }catch{location='/login.html'}
 }
-const setBal=m=>$('#bal').textContent=vnd(m.balance);
+const setBal=m=>{if($('#bal'))$('#bal').textContent=vnd(m.balance)};
 async function logout(){await api('logout',{});location='/login.html'}
 function openAvatarEditor(){
   openModal(`<h2>Ảnh đại diện</h2><p class="note">Chọn ảnh từ thiết bị, kéo để căn vị trí và điều chỉnh độ phóng trước khi lưu.</p>

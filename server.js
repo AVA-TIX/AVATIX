@@ -44,6 +44,7 @@ const auth = role => async (r, s, n) => {
 
       const u = await db.get('SELECT * FROM users WHERE id=?', [id]);
       if (!u) throw E('Tài khoản không tồn tại', 401);
+      if (u.status === 'locked') throw E('Tài khoản của bạn đã bị quản trị viên tạm khóa', 403);
 
       // Kiểm tra phiên đơn nhất theo loại thiết bị (Single Session per Device Type)
       const currentSid = dev === 'mobile' ? u.session_mobile : u.session_desktop;
@@ -66,6 +67,7 @@ const auth = role => async (r, s, n) => {
       if (!sg || sign(id + '.' + exp).slice(0, 32) !== sg || +exp < Date.now()) throw E('Chưa đăng nhập', 401);
       const u = await db.get('SELECT * FROM users WHERE id=?', [id]);
       if (!u) throw E('Chưa đăng nhập', 401);
+      if (u.status === 'locked') throw E('Tài khoản của bạn đã bị quản trị viên tạm khóa', 403);
       if (typeof role === 'string' && u.role !== role) throw E('Không có quyền truy cập', 403);
       if (!u.wallet) {
         u.wallet = chain.getWalletAddress(u.id);
@@ -95,6 +97,20 @@ const maskEmail = e => {
   const [n, d] = String(e || '').split('@');
   if (!d) return e;
   return (n.length <= 2 ? n[0] + '*' : n.slice(0, 2) + '***') + '@' + d;
+};
+const maskPhone = p => {
+  const s = String(p || '').trim();
+  return s.length >= 6 ? s.slice(0, 3) + '****' + s.slice(-3) : s ? '***' : '';
+};
+const maskCccd = c => {
+  const s = String(c || '').trim();
+  return s.length >= 4 ? '********' + s.slice(-4) : null;
+};
+const maskBank = b => {
+  const parts = String(b || '').split(' - ');
+  if (parts.length < 2) return b ? '****' : '';
+  const numStr = parts.slice(1).join(' - ').trim();
+  return `${parts[0]} - ${numStr.length >= 4 ? '****' + numStr.slice(-4) : '****'}`;
 };
 const currentUserOpt = async r => {
   try {
@@ -202,9 +218,10 @@ route('post', 'register', 0, async r => {
   if (await db.get('SELECT 1 FROM users WHERE lower(trim(email))=?', [email])) throw E('Email đã được sử dụng cho tài khoản khác.', 409);
   if (await db.get('SELECT 1 FROM users WHERE trim(phone)=?', [phone])) throw E('Số điện thoại đã được sử dụng cho tài khoản khác.', 409);
   const salt = crypto.randomBytes(16).toString('hex');
+  const initialStatus = role === 'organizer' ? 'pending' : 'active';
   const info = await db.run(
-    'INSERT INTO users(username,hash,salt,email,phone,bank,role,cccd,email_verified) VALUES(?,?,?,?,?,?,?,?,0)',
-    [u, hash(p, salt), salt, email, phone, bank, role, role === 'organizer' ? cccd : null]
+    'INSERT INTO users(username,hash,salt,email,phone,bank,role,cccd,email_verified,status) VALUES(?,?,?,?,?,?,?,?,0,?)',
+    [u, hash(p, salt), salt, email, phone, bank, role, role === 'organizer' ? cccd : null, initialStatus]
   );
   const userId = Number(info.lastInsertRowid);
   const wallet = chain.getWalletAddress(userId);
@@ -283,6 +300,7 @@ route('post', 'forgot-password/confirm', 0, async r => {
 route('post', 'login', 0, async (r, s) => {
   const u = await db.get('SELECT * FROM users WHERE username=?', [r.body.username || '']);
   if (!u || hash(r.body.password || '', u.salt) !== u.hash) throw E('Sai tên đăng nhập hoặc mật khẩu', 401);
+  if (u.status === 'locked') throw E('Tài khoản này đã bị quản trị viên tạm khóa', 403);
   const dev = getDeviceType(r); // 'mobile' | 'desktop'
   const sid = crypto.randomBytes(16).toString('hex');
   const exp = Date.now() + 864e5; // 24 giờ
@@ -411,6 +429,7 @@ route('post', 'topup', true, async r => {
 const evSql = "SELECT e.*,u.username org FROM events e JOIN users u ON u.id=e.org WHERE (e.status != 'cancelled' OR e.status IS NULL)";
 route('get', 'events', true, () => db.all(evSql + ' ORDER BY e.date'));
 route('post', 'events', 'organizer', async r => {
+  if (r.u.status !== 'active') throw E('Tài khoản Ban tổ chức đang chờ Admin duyệt CCCD nên chưa thể mở bán sự kiện', 403);
   const b = r.body, name = String(b.name || '').trim(), venue = String(b.venue || '').trim();
   const desc = String(b.description || '').trim();
   const image = String(b.image || '').trim();
@@ -422,35 +441,46 @@ route('post', 'events', 'organizer', async r => {
   return { ok: 1 };
 });
 
+async function cancelEventAndRefund(ev, { byAdmin = false, adminId = null } = {}) {
+  if (ev.status === 'cancelled') throw E('Sự kiện này đã được hủy trước đó rồi');
+
+  const tickets = await db.all('SELECT * FROM tickets WHERE event=? AND used != 2', [ev.id]);
+  let totalRefund = 0;
+  const stmts = [];
+
+  for (const t of tickets) {
+    totalRefund += t.orig;
+    stmts.push({ sql: 'UPDATE users SET balance=balance+? WHERE id=?', args: [t.orig, t.owner] });
+    stmts.push({ sql: 'UPDATE tickets SET used=2, listed=NULL WHERE id=?', args: [t.id] });
+    const msg = byAdmin
+      ? `Hoàn tiền 100%: Show "${ev.name}" bị Admin đình chỉ (Vé #${t.id})`
+      : `Hoàn tiền 100%: Show "${ev.name}" bị hủy (Vé #${t.id})`;
+    stmts.push({ sql: 'INSERT INTO txs(user,type,amount,note,tx_hash,event_id) VALUES(?,?,?,?,?,?)', args: [t.owner, 'refund', t.orig, msg, null, ev.id] });
+  }
+
+  const orgDeduct = Math.round(totalRefund * (1 - FEE));
+  stmts.push({ sql: 'UPDATE users SET balance=balance-? WHERE id=?', args: [orgDeduct, ev.org] });
+  stmts.push({
+    sql: 'INSERT INTO txs(user,type,amount,note,tx_hash,event_id) VALUES(?,?,?,?,?,?)',
+    args: [ev.org, 'refund', -orgDeduct, `${byAdmin ? 'Admin đình chỉ' : 'Hoàn trả doanh thu: Hủy'} show "${ev.name}" (${tickets.length} vé)`, null, ev.id]
+  });
+  stmts.push({ sql: "UPDATE events SET status='cancelled' WHERE id=?", args: [ev.id] });
+  if (byAdmin && adminId) {
+    stmts.push({
+      sql: 'INSERT INTO txs(user,type,amount,note,tx_hash,event_id) VALUES(?,?,?,?,?,?)',
+      args: [adminId, 'admin', 0, `Đình chỉ & hoàn tiền 100% show vi phạm "${ev.name}" (${tickets.length} vé)`, null, ev.id]
+    });
+  }
+
+  await db.batch(stmts);
+  return { ok: 1, refundedTickets: tickets.length, totalRefund };
+}
+
 route('post', 'events/:id/cancel', 'organizer', async r => {
   const evId = +r.params.id;
   const ev = await db.get('SELECT * FROM events WHERE id=? AND org=?', [evId, r.u.id]);
   if (!ev) throw E('Không tìm thấy sự kiện hoặc bạn không có quyền hủy sự kiện này', 404);
-  if (ev.status === 'cancelled') throw E('Sự kiện này đã được hủy trước đó rồi');
-
-  // Lấy tất cả vé chưa bị hoàn tiền
-  const tickets = await db.all('SELECT * FROM tickets WHERE event=? AND used != 2', [evId]);
-  let totalRefund = 0;
-
-  for (const t of tickets) {
-    totalRefund += t.orig;
-    // Hoàn 100% tiền vé về ví người đang sở hữu vé
-    await db.run('UPDATE users SET balance=balance+? WHERE id=?', [t.orig, t.owner]);
-    // Đánh dấu vé đã hoàn tiền (used=2), hủy niêm yết bán lại
-    await db.run('UPDATE tickets SET used=2, listed=NULL WHERE id=?', [t.id]);
-    // Ghi log giao dịch hoàn tiền cho khán giả
-    await log(t.owner, 'refund', t.orig, `Hoàn tiền 100%: Show "${ev.name}" bị hủy (Vé #${t.id})`, null, evId);
-  }
-
-  // Trừ doanh thu tương ứng từ tài khoản BTC
-  const orgDeduct = Math.round(totalRefund * (1 - FEE));
-  await db.run('UPDATE users SET balance=balance-? WHERE id=?', [orgDeduct, r.u.id]);
-  await log(r.u.id, 'refund', -orgDeduct, `Hoàn trả doanh thu: Hủy show "${ev.name}" (${tickets.length} vé)`, null, evId);
-
-  // Đổi trạng thái sự kiện sang cancelled (giữ nguyên tồn kho cũ để tránh lỗi tính sai số vé đã bán)
-  await db.run("UPDATE events SET status='cancelled' WHERE id=?", [evId]);
-
-  return { ok: 1, refundedTickets: tickets.length, totalRefund };
+  return cancelEventAndRefund(ev, { byAdmin: false });
 });
 
 route('post', 'events/:id/image', 'organizer', async r => {
@@ -691,6 +721,185 @@ route('get', 'history', true, async r => {
     explorerUrl: chain.explorerUrl(tx.tx_hash),
     snowtraceUrl: chain.explorerUrl(tx.tx_hash)
   }));
+});
+
+// ─── Admin Portal (Chỉ role 'admin') ──────────────────────────────────────────
+route('get', 'admin/overview', 'admin', async () => {
+  const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+  const userStats = await db.get(`
+    SELECT
+      SUM(CASE WHEN role='customer' THEN 1 ELSE 0 END) AS customers,
+      SUM(CASE WHEN role='organizer' THEN 1 ELSE 0 END) AS organizers,
+      SUM(CASE WHEN role='organizer' AND status='pending' THEN 1 ELSE 0 END) AS organizersPending,
+      SUM(CASE WHEN role='organizer' AND status='active' THEN 1 ELSE 0 END) AS organizersActive,
+      SUM(CASE WHEN role='organizer' AND status='locked' THEN 1 ELSE 0 END) AS organizersLocked,
+      SUM(CASE WHEN role='customer' AND status='locked' THEN 1 ELSE 0 END) AS customersLocked
+    FROM users WHERE role != 'admin'
+  `);
+  const eventStats = await db.get(`
+    SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN status='cancelled' THEN 1 ELSE 0 END) AS cancelled,
+      SUM(CASE WHEN (status!='cancelled' OR status IS NULL) AND date >= ? THEN 1 ELSE 0 END) AS upcoming,
+      SUM(CASE WHEN (status!='cancelled' OR status IS NULL) AND date < ? THEN 1 ELSE 0 END) AS past,
+      COALESCE(SUM(CASE WHEN (status!='cancelled' OR status IS NULL) THEN total ELSE 0 END), 0) AS totalCapacity
+    FROM events
+  `, [today, today]);
+  const ticketStats = await db.get(`
+    SELECT
+      SUM(CASE WHEN t.used != 2 AND (e.status != 'cancelled' OR e.status IS NULL) THEN 1 ELSE 0 END) AS totalSold,
+      SUM(CASE WHEN t.used = 1 AND (e.status != 'cancelled' OR e.status IS NULL) THEN 1 ELSE 0 END) AS checkedIn,
+      SUM(CASE WHEN t.listed IS NOT NULL AND t.used = 0 AND (e.status != 'cancelled' OR e.status IS NULL) THEN 1 ELSE 0 END) AS listed,
+      SUM(CASE WHEN t.used = 2 THEN 1 ELSE 0 END) AS refunded
+    FROM tickets t
+    JOIN events e ON e.id = t.event
+  `);
+  const primaryFin = await db.get(`
+    SELECT
+      COALESCE(SUM(t.orig), 0) AS primaryGross,
+      COALESCE(SUM(ROUND(t.orig * (1 - ?))), 0) AS primaryOrgNet
+    FROM tickets t
+    JOIN events e ON e.id = t.event
+    WHERE t.used != 2 AND (e.status != 'cancelled' OR e.status IS NULL)
+  `, [FEE]);
+  const resaleFin = await db.get(`
+    SELECT
+      COALESCE(SUM(tx.amount), 0) AS resaleNet,
+      COALESCE(SUM(ROUND(tx.amount / (1 - ?))), 0) AS resaleGross
+    FROM txs tx
+    LEFT JOIN events e ON e.id = tx.event_id
+    WHERE tx.type='sale' AND tx.note LIKE '%(bán lại)%' AND (e.status IS NULL OR e.status != 'cancelled')
+  `, [FEE]);
+
+  const primaryGross = Number(primaryFin?.primaryGross || 0);
+  const primaryOrgNet = Number(primaryFin?.primaryOrgNet || 0);
+  const primaryFee5 = Math.max(0, primaryGross - primaryOrgNet);
+  const resaleNet = Number(resaleFin?.resaleNet || 0);
+  const resaleGross = Number(resaleFin?.resaleGross || 0);
+  const resaleFee5 = Math.max(0, resaleGross - resaleNet);
+  const relayer = await chain.getRelayerBalance();
+
+  return {
+    today,
+    users: {
+      customers: Number(userStats?.customers || 0),
+      organizers: Number(userStats?.organizers || 0),
+      organizersPending: Number(userStats?.organizersPending || 0),
+      organizersActive: Number(userStats?.organizersActive || 0),
+      organizersLocked: Number(userStats?.organizersLocked || 0),
+      customersLocked: Number(userStats?.customersLocked || 0),
+    },
+    events: {
+      total: Number(eventStats?.total || 0),
+      upcoming: Number(eventStats?.upcoming || 0),
+      past: Number(eventStats?.past || 0),
+      cancelled: Number(eventStats?.cancelled || 0),
+    },
+    tickets: {
+      totalSold: Number(ticketStats?.totalSold || 0),
+      checkedIn: Number(ticketStats?.checkedIn || 0),
+      listed: Number(ticketStats?.listed || 0),
+      refunded: Number(ticketStats?.refunded || 0),
+      totalCapacity: Number(eventStats?.totalCapacity || 0),
+    },
+    finance: {
+      grossVolume: primaryGross + resaleGross,
+      primaryFee5,
+      resaleFee5,
+      totalPlatformFee: primaryFee5 + resaleFee5,
+      organizerNetRevenue: primaryOrgNet,
+    },
+    relayer,
+    chain: chain.getStatus(),
+  };
+});
+
+route('get', 'admin/users', 'admin', async () => {
+  const rows = await db.all(`
+    SELECT u.id, u.username, u.role, COALESCE(u.status, 'active') AS status,
+           u.email, u.phone, u.bank, u.cccd, u.wallet, u.email_verified, u.balance,
+           (SELECT COUNT(*) FROM events e WHERE e.org = u.id) AS eventsCount,
+           (SELECT COUNT(*) FROM tickets t WHERE t.owner = u.id AND t.used != 2) AS ticketsCount
+    FROM users u
+    WHERE u.role != 'admin'
+    ORDER BY CASE WHEN u.role='organizer' AND u.status='pending' THEN 0 ELSE 1 END, u.id DESC
+  `);
+  return rows.map(u => ({
+    id: u.id,
+    username: u.username,
+    role: u.role,
+    status: u.status || 'active',
+    email: maskEmail(u.email),
+    phone: maskPhone(u.phone),
+    cccd: maskCccd(u.cccd),
+    bank: maskBank(u.bank),
+    wallet: u.wallet || null,
+    emailVerified: Boolean(u.email_verified),
+    balance: Number(u.balance || 0),
+    eventsCount: Number(u.eventsCount || 0),
+    ticketsCount: Number(u.ticketsCount || 0),
+  }));
+});
+
+route('post', 'admin/users/:id/status', 'admin', async r => {
+  const uid = +r.params.id;
+  const nextStatus = String(r.body.status || '').trim();
+  if (!['active', 'locked'].includes(nextStatus)) throw E('Trạng thái không hợp lệ (chỉ nhận active hoặc locked)');
+  const target = await db.get('SELECT id, username, role, status FROM users WHERE id=?', [uid]);
+  if (!target) throw E('Không tìm thấy tài khoản', 404);
+  if (target.role === 'admin') throw E('Không thể thay đổi trạng thái tài khoản quản trị', 403);
+
+  await db.run('UPDATE users SET status=? WHERE id=?', [nextStatus, uid]);
+  if (nextStatus === 'locked') {
+    await db.run('UPDATE users SET session_desktop=NULL, session_mobile=NULL WHERE id=?', [uid]);
+  }
+  await log(r.u.id, 'admin', 0, `${nextStatus === 'active' ? 'Duyệt / Mở khóa' : 'Khóa'} tài khoản ${target.username} (${target.role})`);
+  return { ok: 1, id: uid, status: nextStatus };
+});
+
+route('get', 'admin/events', 'admin', async () => {
+  const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+  const events = await db.all(`
+    SELECT e.id, e.org, e.name, e.date, e.venue, e.price, e.total, e.remain,
+           COALESCE(e.status, 'active') AS status, e.max_per_user,
+           u.username AS orgName, COALESCE(u.status, 'active') AS orgStatus
+    FROM events e
+    JOIN users u ON u.id = e.org
+    ORDER BY e.date DESC, e.id DESC
+  `);
+  const result = [];
+  for (const e of events) {
+    const isCancelled = e.status === 'cancelled';
+    const checkedRow = await db.get('SELECT COUNT(*) c FROM tickets WHERE event=? AND used=1', [e.id]);
+    const listedRow = await db.get('SELECT COUNT(*) c FROM tickets WHERE event=? AND listed IS NOT NULL AND used=0', [e.id]);
+    const soldRow = await db.get('SELECT COUNT(*) c, COALESCE(SUM(orig),0) gross, COALESCE(SUM(ROUND(orig*(1-?))),0) orgNet FROM tickets WHERE event=? AND used!=2', [FEE, e.id]);
+    const refundedRow = await db.get('SELECT COUNT(*) c FROM tickets WHERE event=? AND used=2', [e.id]);
+
+    const sold = isCancelled ? 0 : Number(soldRow?.c || 0);
+    const gross = isCancelled ? 0 : Number(soldRow?.gross || 0);
+    const revenue = isCancelled ? 0 : Number(soldRow?.orgNet || 0);
+    const platformFee = isCancelled ? 0 : Math.max(0, gross - revenue);
+    const lifecycle = isCancelled ? 'cancelled' : e.date < today ? 'past' : 'upcoming';
+
+    result.push({
+      ...e,
+      sold,
+      checked: isCancelled ? 0 : Number(checkedRow?.c || 0),
+      listed: isCancelled ? 0 : Number(listedRow?.c || 0),
+      refunded: Number(refundedRow?.c || 0),
+      revenue,
+      platformFee,
+      lifecycle,
+    });
+  }
+  return result;
+});
+
+route('post', 'admin/events/:id/cancel', 'admin', async r => {
+  const evId = +r.params.id;
+  const ev = await db.get('SELECT * FROM events WHERE id=?', [evId]);
+  if (!ev) throw E('Không tìm thấy sự kiện', 404);
+  return cancelEventAndRefund(ev, { byAdmin: true, adminId: r.u.id });
 });
 
 // ─── Static + Error handler ───────────────────────────────────────────────────

@@ -235,6 +235,26 @@ function getStatus() {
   };
 }
 
+async function getRelayerBalance() {
+  if (!enabled || !provider || !wallet) return null;
+  try {
+    const bal = await Promise.race([
+      provider.getBalance(wallet.address),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("Balance RPC timeout")), 4000)),
+    ]);
+    const balanceAvax = ethers.formatEther(bal);
+    return {
+      address: wallet.address,
+      balanceAvax,
+      lowGas: Number(balanceAvax) < 0.05,
+      explorerUrl: contractExplorerUrl(wallet.address),
+    };
+  } catch (e) {
+    console.error("[Blockchain] ⚠️  getRelayerBalance failed:", e.message);
+    return { address: wallet.address, balanceAvax: null, lowGas: false, explorerUrl: contractExplorerUrl(wallet.address) };
+  }
+}
+
 module.exports = {
   init,
   getWalletAddress,
@@ -244,6 +264,7 @@ module.exports = {
   onBuyResale,
   onScanTicket,
   getOnChainTicket,
+  getRelayerBalance,
   explorerUrl,
   getStatus,
   isEnabled: () => enabled,

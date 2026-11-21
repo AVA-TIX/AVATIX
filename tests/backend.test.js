@@ -148,12 +148,59 @@ test('account avatar and email-only OTP API', async t => {
         assert.equal((await request('buy', { event: 1 })).status, 200);
 
         // Real registered user still cannot bypass OTP even when DEMO_OTP_BYPASS=1
-        assert.equal((await request('register', { username: 'real_user_check', password: 'Testpass1', email: 'realcheck@example.com', phone: '0901234569', bank: 'VCB - 1234567890', role: 'customer' }, false)).status, 200);
+        assert.equal((await request('register', { username: 'real_user_check', password: 'Testpass1', pin: '246810', pinConfirmation: '246810', email: 'realcheck@example.com', phone: '0905550299', bank: 'VCB - 1234567890', role: 'customer' }, false)).status, 200);
         await login('real_user_check', 'Testpass1');
         assert.equal((await request('me')).body.demoOtpBypass, false);
         assert.equal((await request('buy', { event: 1 })).status, 400);
       } finally {
         prevBypass === undefined ? delete process.env.DEMO_OTP_BYPASS : (process.env.DEMO_OTP_BYPASS = prevBypass);
+      }
+    });
+    await t.test('admin overview, masked PII, organizer approval, and violating show cancellation', async () => {
+      const prevAdminUser = process.env.ADMIN_USER, prevAdminPass = process.env.ADMIN_PASS;
+      process.env.ADMIN_USER = 'avatix_admin_test';
+      process.env.ADMIN_PASS = 'AdminTest1';
+      await db.migrate();
+      try {
+        await login('demo_customer');
+        assert.equal((await request('admin/overview')).status, 403);
+        const regOrg = await request('register', { username: 'pending_btc_1', password: 'OrgPass1', pin: '135790', pinConfirmation: '135790', email: 'pending.btc@gmail.com', phone: '0905550888', bank: 'VCB - 1234567890', role: 'organizer', cccd: '079099123456' }, false);
+        assert.equal(regOrg.status, 200);
+        const orgRes = await request('login', { username: 'pending_btc_1', password: 'OrgPass1' }, false);
+        const orgCookie = orgRes.cookie;
+        const callAs = async (url, body, c) => {
+          const r = await fetch(base + url, { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', Cookie: c }, body: body === undefined ? undefined : JSON.stringify(body) });
+          return { status: r.status, body: await r.json() };
+        };
+        assert.equal((await callAs('events', { name: 'Pending Blocked', date: '2027-06-01', venue: 'HCM', price: 100000, total: 10 }, orgCookie)).status, 403);
+
+        const adminLogin = await request('login', { username: 'avatix_admin_test', password: 'AdminTest1' }, false);
+        assert.equal(adminLogin.status, 200);
+        const adminCookie = adminLogin.cookie;
+        const list = await callAs('admin/users', undefined, adminCookie);
+        const target = list.body.find(u => u.username === 'pending_btc_1');
+        assert.equal(target.email, 'pe***@gmail.com');
+        assert.equal(target.phone, '090****888');
+        assert.equal(target.cccd, '********3456');
+        assert.equal(target.bank, 'VCB - ****7890');
+        assert.equal((await callAs(`admin/users/${target.id}/status`, { status: 'active' }, adminCookie)).status, 200);
+        assert.equal((await callAs('events', { name: 'Violating Show', date: '2027-06-01', venue: 'HCM', price: 200000, total: 10 }, orgCookie)).status, 200);
+
+        const evRow = await db.get("SELECT id FROM events WHERE name='Violating Show'");
+        const custBefore = (await db.get("SELECT balance FROM users WHERE username='demo_customer'")).balance;
+        process.env.DEMO_OTP_BYPASS = '1';
+        await login('demo_customer');
+        assert.equal((await request('buy', { event: evRow.id })).status, 200);
+        const cancelRes = await callAs(`admin/events/${evRow.id}/cancel`, {}, adminCookie);
+        assert.equal(cancelRes.status, 200);
+        assert.equal(cancelRes.body.refundedTickets, 1);
+        assert.equal(cancelRes.body.totalRefund, 200000);
+        assert.equal((await db.get("SELECT balance FROM users WHERE username='demo_customer'")).balance, custBefore);
+        assert.equal((await db.get('SELECT status FROM events WHERE id=?', [evRow.id])).status, 'cancelled');
+      } finally {
+        delete process.env.DEMO_OTP_BYPASS;
+        prevAdminUser === undefined ? delete process.env.ADMIN_USER : (process.env.ADMIN_USER = prevAdminUser);
+        prevAdminPass === undefined ? delete process.env.ADMIN_PASS : (process.env.ADMIN_PASS = prevAdminPass);
       }
     });
   } finally {

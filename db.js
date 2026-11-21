@@ -104,6 +104,7 @@ async function _migrate(db) {
        bank TEXT, role TEXT, cccd TEXT,
        wallet TEXT, avatar TEXT, email_verified INTEGER DEFAULT 0,
        balance INTEGER DEFAULT 0,
+       status TEXT DEFAULT 'active',
        session_desktop TEXT DEFAULT NULL,
        session_mobile TEXT DEFAULT NULL
      )`,
@@ -149,6 +150,7 @@ async function _migrate(db) {
     { check: `PRAGMA table_info(users)`,   col: 'avatar',          sql: `ALTER TABLE users   ADD COLUMN avatar TEXT` },
     { check: `PRAGMA table_info(users)`,   col: 'wallet',          sql: `ALTER TABLE users   ADD COLUMN wallet TEXT` },
     { check: `PRAGMA table_info(users)`,   col: 'email_verified',  sql: `ALTER TABLE users   ADD COLUMN email_verified INTEGER DEFAULT 0` },
+    { check: `PRAGMA table_info(users)`,   col: 'status',          sql: `ALTER TABLE users   ADD COLUMN status TEXT DEFAULT 'active'` },
     { check: `PRAGMA table_info(users)`,   col: 'session_desktop', sql: `ALTER TABLE users   ADD COLUMN session_desktop TEXT DEFAULT NULL` },
     { check: `PRAGMA table_info(users)`,   col: 'session_mobile',  sql: `ALTER TABLE users   ADD COLUMN session_mobile TEXT DEFAULT NULL` },
     { check: `PRAGMA table_info(events)`,  col: 'description',    sql: `ALTER TABLE events  ADD COLUMN description TEXT` },
@@ -169,6 +171,7 @@ async function _migrate(db) {
       try { await db.run(m.sql); } catch (_) { /* cột đã tồn tại */ }
     }
   }
+  await db.run("UPDATE users SET status='active' WHERE status IS NULL OR TRIM(status) = ''");
 
   // Enforce new contact assignments atomically, including concurrent signups.
   // Triggers preserve legacy accounts even if old data already has duplicates.
@@ -352,6 +355,23 @@ async function _migrate(db) {
     } else if (existing.balance < 500000) {
       // Nạp lại tiền nếu tài khoản test bị hết tiền
       await db.run('UPDATE users SET balance=balance+? WHERE id=?', [acc.minBal, existing.id]);
+    }
+  }
+
+  // ── Khởi tạo tài khoản Admin nếu có ADMIN_USER & ADMIN_PASS trong env ──
+  const adminUser = String(process.env.ADMIN_USER || '').trim();
+  const adminPass = String(process.env.ADMIN_PASS || '');
+  if (adminUser && adminPass) {
+    const existingAdmin = await db.get('SELECT id FROM users WHERE username=?', [adminUser]);
+    if (!existingAdmin) {
+      const salt = crypto.randomBytes(16).toString('hex');
+      const passHash = crypto.scryptSync(adminPass, salt, 32).toString('hex');
+      await db.run(
+        `INSERT INTO users(username,hash,salt,email,phone,bank,role,cccd,email_verified,balance,status)
+         VALUES(?,?,?,?,?,?, 'admin', NULL, 1, 0, 'active')`,
+        [adminUser, passHash, salt, process.env.ADMIN_EMAIL || 'admin@avatix.vn', '0900000000', 'AVA-TIX Treasury - 000000000']
+      );
+      console.log(`[DB] ✓ Tạo tài khoản quản trị: ${adminUser} (admin)`);
     }
   }
 }

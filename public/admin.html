@@ -1,0 +1,324 @@
+<!doctype html><html lang=vi><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AVA-TIX · Quản trị hệ thống (Admin Portal)</title><script src=theme.js></script><link rel=stylesheet href=style.css><link rel=stylesheet href=profile.css><link rel=stylesheet href=dark.css>
+<body class=admin-page><header class=top id=top></header><main class=wrap><div class=page-heading><p class=eyebrow>Cổng quản trị viên · AVA-TIX</p><h1 id=pageTitle>Tổng quan sàn &amp; Vận hành</h1></div><div class=tabs id=tabs></div><div id=body></div></main>
+<footer class=site-footer>
+  <div class=footer-wrap>
+    <div class=footer-col>
+      <div class=logo style="margin-bottom:12px"><span>AVA</span>-TIX <small>ADMIN</small></div>
+      <p>Bảng điều hành nội bộ dành cho Quản trị viên AVA-TIX: giám sát dòng tiền phí sàn 5%, số dư gas Relayer trên Avalanche Fuji, phê duyệt Ban tổ chức và kiểm soát toàn bộ sự kiện.</p>
+    </div>
+    <div class=footer-col>
+      <h4>Điều hành nhanh</h4>
+      <ul class=footer-links>
+        <li><a href="#" onclick="selectAdminTab('overview');return false">Tổng quan sàn &amp; Phí 5%</a></li>
+        <li><a href="#" onclick="selectAdminTab('users');return false">Quản lý Users &amp; Duyệt BTC</a></li>
+        <li><a href="#" onclick="selectAdminTab('events');return false">Danh sách Show toàn hệ thống</a></li>
+      </ul>
+    </div>
+    <div class=footer-col>
+      <h4>Hệ thống &amp; Bảo mật</h4>
+      <ul class=footer-links>
+        <li><a href="#" onclick="showChainInfo();return false">Kiểm tra Smart Contract Explorer</a></li>
+        <li><a href="#" onclick="openSecurityModal();return false">Tài khoản &amp; Bảo mật PIN</a></li>
+        <li><a href="#" onclick="openTermsModal();return false">Điều khoản &amp; Chính sách AVA-TIX</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class=footer-bottom>&copy; 2026 AVA-TIX Admin Portal · Dữ liệu nhạy cảm (Email, SĐT, CCCD, STK) đã được che bảo mật từ API.</div>
+</footer>
+<script src=security-ui.js></script><script src=app.js></script><script>
+let tab='overview',overview=null,users=[],events=[];
+let userFilter='all',eventFilter='all';
+const T={overview:'Tổng quan sàn',users:'Users & BTC',events:'Tất cả Show diễn'};
+
+(async()=>{window.me=await init('admin');if(me){window.syncNavigation?.(tab);load()}})();
+window.navigateSection=section=>{if(T[section]){selectAdminTab(section)}};
+
+function selectAdminTab(k){
+  tab=k;
+  window.syncNavigation?.(tab);
+  const titles={overview:'Tổng quan sàn & Vận hành',users:'Quản lý Khách hàng & Ban tổ chức',events:'Danh sách Show toàn hệ thống'};
+  if($('#pageTitle'))$('#pageTitle').textContent=titles[tab]||'Quản trị hệ thống';
+  draw();
+}
+
+async function load(){
+  [overview,users,events]=await Promise.all([api('admin/overview'),api('admin/users'),api('admin/events')]);
+  draw();
+}
+
+function draw(){
+  $('#tabs').innerHTML=Object.entries(T).map(([k,v])=>{
+    const extra=(k==='users'&&(overview?.users?.organizersPending||0)>0)?` (${overview.users.organizersPending} chờ duyệt)`:'';
+    return `<button class="${k===tab?'on':''}" onclick="selectAdminTab('${k}')">${v}${extra}</button>`;
+  }).join('');
+  window.syncNavigation?.(tab);
+  const b=$('#body');
+  if(!overview){b.innerHTML='<div class="card empty">Đang tải dữ liệu quản trị...</div>';return}
+  if(tab==='overview') renderOverview(b);
+  else if(tab==='users') renderUsers(b);
+  else renderEvents(b);
+}
+
+function renderOverview(b){
+  const u=overview.users, t=overview.tickets, e=overview.events, f=overview.finance, rel=overview.relayer, ch=overview.chain||{};
+  const pendingOrgs=users.filter(x=>x.role==='organizer'&&x.status==='pending');
+  const totalUsers=u.customers+u.organizers;
+  const gasText=rel
+    ?(rel.balanceAvax!==null?`${Number(rel.balanceAvax).toFixed(4)} AVAX`:'Không đọc được RPC')
+    :'Off-chain fallback';
+  const gasSub=rel
+    ?`${rel.lowGas?'⚠️ Gas thấp (< 0.05 AVAX) · ':'✓ Đủ gas vận hành · '}<span class=mono>${esc(shortHash(rel.address))}</span>`
+    :'Chưa kết nối Avalanche Fuji';
+
+  b.innerHTML=`
+    <div class=tiles style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+      <div class=card>
+        <span class=tile-label>Tổng số User hệ thống</span>
+        <b>${totalUsers}</b>
+        <div class=note style="margin-top:6px">${u.customers} Khách · ${u.organizers} Ban tổ chức${u.organizersPending?` · <b style="color:var(--warning-text)">${u.organizersPending} BTC chờ duyệt</b>`:''}</div>
+      </div>
+      <div class=card>
+        <span class=tile-label>Tổng vé toàn sàn</span>
+        <b style="color:var(--tb-green)">${t.totalSold}/${t.totalCapacity}</b>
+        <div class=note style="margin-top:6px">${t.checkedIn} đã check-in · ${t.listed} đang bán lại${t.refunded?` · ${t.refunded} đã hoàn`:''}</div>
+      </div>
+      <div class=card>
+        <span class=tile-label>Tổng phí sàn 5% AVA-TIX</span>
+        <b style="color:var(--tb-green)">${vnd(f.totalPlatformFee)}</b>
+        <div class=note style="margin-top:6px">Sơ cấp: ${vnd(f.primaryFee5)} · Thứ cấp: ${vnd(f.resaleFee5)}</div>
+      </div>
+      <div class=card>
+        <span class=tile-label>Số dư gas ví Relayer</span>
+        <b style="color:${rel?.lowGas?'var(--negative)':ch.enabled?'var(--tb-green)':'var(--text-muted)'}">${gasText}</b>
+        <div class=note style="margin-top:6px">${gasSub}${rel?.explorerUrl?` · <a href="${esc(rel.explorerUrl)}" target=_blank rel=noopener>Snowtrace ↗</a>`:''}</div>
+      </div>
+    </div>
+
+    <div class=chart-card>
+      <div class=chart-head>
+        <div>
+          <h3>💰 Dòng tiền &amp; Trạng thái Show toàn sàn</h3>
+          <p class=chart-sub>Tổng khối lượng giao dịch hiệu lực (không tính show đã hủy): <b>${vnd(f.grossVolume)}</b></p>
+        </div>
+        <button class="btn sm ghost" onclick="load()">↻ Làm mới số liệu</button>
+      </div>
+      <div class=single-kpis>
+        <div class=single-kpi-box><span>Tổng số Show</span><b>${e.total}</b></div>
+        <div class=single-kpi-box><span>Đang bán vé</span><b style="color:var(--tb-green)">${e.upcoming}</b></div>
+        <div class=single-kpi-box><span>Đã diễn ra</span><b>${e.past}</b></div>
+        <div class=single-kpi-box><span>Đã hủy (hoàn 100%)</span><b style="color:var(--negative)">${e.cancelled}</b></div>
+      </div>
+    </div>
+
+    ${pendingOrgs.length ? `
+      <div class=chart-card style="border-color:var(--warning-text)">
+        <div class=chart-head>
+          <div>
+            <h3>⏳ Ban tổ chức đang chờ duyệt CCCD (${pendingOrgs.length})</h3>
+            <p class=chart-sub>Tài khoản BTC mới đăng ký cần được Admin xét duyệt trước khi mở bán sự kiện.</p>
+          </div>
+          <button class="btn sm ghost" onclick="userFilter='pending';selectAdminTab('users')">Xem danh sách</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          ${pendingOrgs.map(o=>`
+            <div class=detail-box style="margin:0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+              <div>
+                <b>${esc(o.username)}</b> <span class="badge">BTC</span>
+                <div class=note style="margin:3px 0 0">Email: ${esc(o.email)} · SĐT: ${esc(o.phone)} · CCCD: <b>${esc(o.cccd||'—')}</b></div>
+              </div>
+              <div style="display:flex;gap:8px">
+                <button class="btn sm green" onclick="setUserStatus(${o.id},'active','${esc(o.username)}')">✅ Duyệt BTC</button>
+                <button class="btn sm ghost red" onclick="setUserStatus(${o.id},'locked','${esc(o.username)}')">Khóa</button>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>
+    ` : `<div class=card><p class=note style="margin:0">✅ Hiện không có tài khoản Ban tổ chức nào đang chờ duyệt. Tổng doanh thu BTC thực nhận toàn sàn: <b>${vnd(f.organizerNetRevenue)}</b>.</p></div>`}
+  `;
+}
+
+function statusBadge(st){
+  if(st==='pending')return '<span class="badge" style="background:var(--warning-bg);color:var(--warning-text)">⏳ Chờ duyệt</span>';
+  if(st==='locked')return '<span class="badge out">🔒 Đã khóa</span>';
+  return '<span class="badge ok">✓ Hoạt động</span>';
+}
+
+function renderUsers(b){
+  const counts={
+    all:users.length,
+    pending:users.filter(u=>u.role==='organizer'&&u.status==='pending').length,
+    organizer:users.filter(u=>u.role==='organizer').length,
+    customer:users.filter(u=>u.role==='customer').length,
+    locked:users.filter(u=>u.status==='locked').length,
+  };
+  const pills=[
+    ['all',`Tất cả (${counts.all})`],
+    ['pending',`⏳ Chờ duyệt BTC (${counts.pending})`],
+    ['organizer',`Ban tổ chức (${counts.organizer})`],
+    ['customer',`Khách hàng (${counts.customer})`],
+    ['locked',`Đã khóa (${counts.locked})`]
+  ];
+  b.innerHTML=`
+    <div class=show-filter-bar>
+      <div class=filter-pills>
+        ${pills.map(([k,lb])=>`<button type=button class="filter-pill ${userFilter===k?'on':''}" onclick="userFilter='${k}';renderUsers($('#body'))">${lb}</button>`).join('')}
+      </div>
+      <div class=show-filter-search>
+        <div class=search-box><input id=uq placeholder="Tìm theo username..." oninput="drawUserList()"></div>
+      </div>
+    </div>
+    <div id=userListWrap></div>`;
+  drawUserList();
+}
+
+function drawUserList(){
+  const q=($('#uq')?.value||'').trim().toLowerCase();
+  const list=users.filter(u=>{
+    const matchTab=userFilter==='all'?true:userFilter==='pending'?(u.role==='organizer'&&u.status==='pending'):userFilter==='locked'?(u.status==='locked'):u.role===userFilter;
+    return matchTab&&u.username.toLowerCase().includes(q);
+  });
+  const wrap=$('#userListWrap');
+  if(!list.length){wrap.innerHTML='<div class="card empty">Không có tài khoản nào phù hợp.</div>';return}
+
+  const actions=u=>{
+    if(u.role==='organizer'&&u.status==='pending'){
+      return `<button class="btn sm green" onclick="setUserStatus(${u.id},'active','${esc(u.username)}')">✅ Duyệt BTC</button>
+              <button class="btn sm ghost red" onclick="setUserStatus(${u.id},'locked','${esc(u.username)}')">Khóa</button>`;
+    }
+    if(u.status==='locked'){
+      return `<button class="btn sm" onclick="setUserStatus(${u.id},'active','${esc(u.username)}')">🔓 Mở khóa</button>`;
+    }
+    return `<button class="btn sm ghost red" onclick="setUserStatus(${u.id},'locked','${esc(u.username)}')">🔒 Khóa</button>`;
+  };
+
+  const desktop=`<div class="card tbl-wrap hist-desktop"><table class=hist>
+    <thead><tr><th>Tài khoản</th><th>Vai trò</th><th>Thông tin (đã che)</th><th>Hoạt động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+    <tbody>${list.map(u=>`<tr>
+      <td><b>${esc(u.username)}</b><div class=note style="margin:2px 0 0">${u.emailVerified?'✓ Đã xác thực email':'Chưa xác thực email'}</div></td>
+      <td><span class="badge ${u.role==='organizer'?'nft':''}">${u.role==='organizer'?'Ban tổ chức':'Khách hàng'}</span></td>
+      <td style="font-size:13px">
+        Email: ${esc(u.email)}<br>
+        SĐT: ${esc(u.phone)}${u.cccd?`<br>CCCD: <b>${esc(u.cccd)}</b>`:''}<br>
+        NH: ${esc(u.bank)}
+      </td>
+      <td style="font-size:13px">
+        ${u.role==='organizer'?`<b>${u.eventsCount}</b> show đã tạo`:`<b>${u.ticketsCount}</b> vé đang có`}
+        <div class=note style="margin:2px 0 0">Ví: ${vnd(u.balance)}</div>
+      </td>
+      <td>${statusBadge(u.status)}</td>
+      <td><div style="display:flex;gap:6px;flex-wrap:wrap">${actions(u)}</div></td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+
+  const mobile=`<div class=hist-mobile>${list.map(u=>`
+    <div class=hist-card>
+      <div class=hist-card-head>
+        <div><b>${esc(u.username)}</b> <span class="badge ${u.role==='organizer'?'nft':''}">${u.role==='organizer'?'BTC':'Khách'}</span></div>
+        ${statusBadge(u.status)}
+      </div>
+      <div class=hist-card-body>
+        Email: ${esc(u.email)} · SĐT: ${esc(u.phone)}${u.cccd?` · CCCD: <b>${esc(u.cccd)}</b>`:''}<br>
+        ${u.role==='organizer'?`${u.eventsCount} show đã tạo`:`${u.ticketsCount} vé đang có`} · Số dư: <b>${vnd(u.balance)}</b>
+      </div>
+      <div class=hist-card-foot>
+        <span>${u.emailVerified?'✓ Email đã xác thực':'Chưa xác thực email'}</span>
+        <div style="display:flex;gap:6px">${actions(u)}</div>
+      </div>
+    </div>`).join('')}</div>`;
+
+  wrap.innerHTML=desktop+mobile;
+}
+
+async function setUserStatus(id,nextStatus,uname){
+  const verb=nextStatus==='active'?'Duyệt / Mở khóa':'Khóa';
+  if(!confirm(`Xác nhận ${verb} tài khoản "${uname}"?`))return;
+  try{
+    await api(`admin/users/${id}/status`,{status:nextStatus});
+    toast(`Đã ${verb.toLowerCase()} tài khoản ${uname}`);
+    await load();
+  }catch(e){toast(e.message,1)}
+}
+
+function renderEvents(b){
+  const counts={
+    all:events.length,
+    upcoming:events.filter(e=>e.lifecycle==='upcoming').length,
+    past:events.filter(e=>e.lifecycle==='past').length,
+    cancelled:events.filter(e=>e.lifecycle==='cancelled').length,
+  };
+  const pills=[
+    ['all',`Tất cả (${counts.all})`],
+    ['upcoming',`Đang bán vé (${counts.upcoming})`],
+    ['past',`Đã diễn ra (${counts.past})`],
+    ['cancelled',`Đã hủy (${counts.cancelled})`]
+  ];
+  b.innerHTML=`
+    <div class=show-filter-bar>
+      <div class=filter-pills>
+        ${pills.map(([k,lb])=>`<button type=button class="filter-pill ${eventFilter===k?'on':''}" onclick="eventFilter='${k}';renderEvents($('#body'))">${lb}</button>`).join('')}
+      </div>
+      <div class=show-filter-search>
+        <div class=search-box><input id=eq placeholder="Tìm show, địa điểm, hoặc BTC..." oninput="drawEventList()"></div>
+      </div>
+    </div>
+    <div id=eventListWrap></div>`;
+  drawEventList();
+}
+
+function drawEventList(){
+  const q=($('#eq')?.value||'').trim().toLowerCase();
+  const list=events.filter(e=>{
+    const matchTab=eventFilter==='all'?true:e.lifecycle===eventFilter;
+    return matchTab&&(e.name+' '+e.venue+' '+e.orgName).toLowerCase().includes(q);
+  });
+  const wrap=$('#eventListWrap');
+  if(!list.length){wrap.innerHTML='<div class="card empty">Không có sự kiện nào phù hợp.</div>';return}
+
+  const evBadge=e=>e.lifecycle==='cancelled'?'<span class="badge out">Đã hủy</span>':e.lifecycle==='past'?'<span class=badge>Đã diễn ra</span>':'<span class="badge ok">Đang bán vé</span>';
+  const evAction=e=>e.lifecycle==='cancelled'
+    ?'<span class=note>Đã hoàn tiền</span>'
+    :`<button class="btn sm ghost red" onclick="cancelShowByAdmin(${e.id},'${esc(e.name).replace(/'/g,"&#39;")}',${e.sold})">🚫 Hủy &amp; Hoàn tiền</button>`;
+
+  const desktop=`<div class="card tbl-wrap hist-desktop"><table class=hist>
+    <thead><tr><th>Sự kiện</th><th>Ban tổ chức</th><th>Giá / Vé bán</th><th>Doanh thu BTC (95%)</th><th>Phí sàn (5%)</th><th>Trạng thái</th><th>Kiểm duyệt</th></tr></thead>
+    <tbody>${list.map(e=>`<tr>
+      <td><b>${esc(e.name)}</b><div class=note style="margin:2px 0 0">📅 ${dmy(e.date)} · 📍 ${esc(e.venue)}</div></td>
+      <td><b>${esc(e.orgName)}</b><div>${statusBadge(e.orgStatus)}</div></td>
+      <td>${vnd(e.price)}<div class=note style="margin:2px 0 0"><b>${e.sold}/${e.total}</b> vé · Check-in: ${e.checked}</div></td>
+      <td><b style="color:var(--tb-green)">${vnd(e.revenue)}</b></td>
+      <td><b>${vnd(e.platformFee)}</b></td>
+      <td>${evBadge(e)}</td>
+      <td>${evAction(e)}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+
+  const mobile=`<div class=hist-mobile>${list.map(e=>`
+    <div class=hist-card>
+      <div class=hist-card-head>
+        <b>${esc(e.name)}</b>
+        ${evBadge(e)}
+      </div>
+      <div class=hist-card-body>
+        BTC: <b>${esc(e.orgName)}</b> · 📅 ${dmy(e.date)}<br>
+        Giá: ${vnd(e.price)} · Đã bán: <b>${e.sold}/${e.total}</b> · Check-in: ${e.checked}<br>
+        BTC nhận: <b style="color:var(--tb-green)">${vnd(e.revenue)}</b> · Phí sàn 5%: <b>${vnd(e.platformFee)}</b>
+      </div>
+      <div class=hist-card-foot>
+        <span>${e.lifecycle==='cancelled'?`Đã hoàn ${e.refunded} vé`:'Đang hiển thị trên sàn'}</span>
+        <div>${evAction(e)}</div>
+      </div>
+    </div>`).join('')}</div>`;
+
+  wrap.innerHTML=desktop+mobile;
+}
+
+async function cancelShowByAdmin(id,name,sold){
+  if(!confirm(`Xác nhận đình chỉ show vi phạm "${name}"?\n\nHệ thống sẽ gỡ show khỏi sàn ngay lập tức và hoàn trả 100% tiền vé (${sold} vé đã bán) về ví khán giả.`))return;
+  try{
+    const res=await api(`admin/events/${id}/cancel`,{});
+    toast(`Đã đình chỉ show & hoàn ${vnd(res.totalRefund)} cho ${res.refundedTickets} vé!`);
+    await load();
+  }catch(e){toast(e.message,1)}
+}
+</script>
+</body></html>
