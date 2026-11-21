@@ -21,25 +21,28 @@
         <li><a href="#" onclick="openTermsModal();return false">Quy định xác minh CCCD &amp; Trách nhiệm BTC</a></li>
         <li><a href="#" onclick="openSecurityModal();return false">Bảo mật tài khoản &amp; Email OTP</a></li>
         <li><a href="#" onclick="showChainInfo();return false">Kiểm tra Smart Contract Explorer</a></li>
-        <li><a href="mailto:organizer@avatix.vn">Hỗ trợ kỹ thuật: organizer@avatix.vn</a></li>
+        <li><a href="mailto:avatix.hcmus@gmail.com">Hỗ trợ kỹ thuật: avatix.hcmus@gmail.com</a></li>
       </ul>
     </div>
   </div>
   <div class=footer-bottom>&copy; 2026 AVA-TIX · Dự án UniHack Avalanche 2026</div>
 </footer>
 <script src=security-ui.js></script><script src=app.js></script><script>
-let tab='stats',st=[],hs=[],dailyStats={today:'',rows:[]};
+let tab='stats',st=[],hs=[],dailyStats={today:'',rows:[]},chainPollTimer=null;
 let showFilter='upcoming',chartMetric='rev',chartRange=14,selectedChartShowId=null,hiddenChartIds=new Set(),hoverDayIdx=null,singleHoverIdx=null;
 const CHART_COLORS=['#FF385C','#00B14F','#2563EB','#F59E0B','#8B5CF6','#EC4899','#06B6D4','#EA580C'];
 const T={stats:'Thống kê show diễn',create:'Tạo sự kiện mới',scan:'Soát vé tại cổng',history:'Lịch sử on-chain'};
 (async()=>{window.me=await init('organizer');if(me)load()})();
 async function load(){
+ clearTimeout(chainPollTimer);
  [st,dailyStats,hs]=await Promise.all([api('stats'),api('stats/daily'),api('history')]);
  if(!selectedChartShowId||!st.some(x=>x.id===selectedChartShowId)){
   const firstUp=st.find(x=>classifyShow(x)==='upcoming')||st.find(x=>x.status!=='cancelled')||st[0];
   selectedChartShowId=firstUp?firstUp.id:null;
  }
  draw();
+ const hasPendingChain=hs.some(x=>!x.tx_hash&&['queued','processing','submitted'].includes(x.chain_state));
+ if(hasPendingChain) chainPollTimer=setTimeout(load,3000);
 }
 
 function getTodayVn(){

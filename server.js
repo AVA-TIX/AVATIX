@@ -622,8 +622,9 @@ route('post', 'list', 'customer', async r => {
   await db.run('UPDATE tickets SET listed=? WHERE id=?', [p, t.id]);
   let chainRes = null;
   if (isActiveContractTicket(t)) {
-    chainRes = await chain.onListResale(t.token_id, r.u.wallet, p, t.id);
-    if (chainRes?.txHash) await log(r.u.id, 'list', 0, `Đăng bán vé #${t.id} (NFT #${t.token_id}) giá ${p.toLocaleString('vi-VN')}đ`, chainRes.txHash);
+    const listTxId = await log(r.u.id, 'list', 0, `Đăng bán vé #${t.id}${t.token_id ? ` (NFT #${t.token_id})` : ''} giá ${p.toLocaleString('vi-VN')}đ`, null, t.event);
+    chainRes = await chain.onListResale(t.token_id, r.u.wallet, p, t.id, { historyIds: [listTxId] });
+    if (chainRes?.txHash) await db.run('UPDATE txs SET tx_hash=? WHERE id=?', [chainRes.txHash, listTxId]);
   }
   return { ok: 1, txHash: chainRes?.txHash || null, explorerUrl: chain.explorerUrl(chainRes?.txHash) };
 });
@@ -700,12 +701,13 @@ route('post', 'scan', 'organizer', async r => {
   if (t.used === 2) throw E('Vé không hợp lệ: Sự kiện đã bị hủy và tiền vé đã hoàn trả cho khán giả');
   if (t.used) throw E('Vé đã được sử dụng trước đó');
   await db.run('UPDATE tickets SET used=1,listed=NULL WHERE id=?', [t.id]);
+  const scanTxId = await log(r.u.id, 'scan', 0, `Check-in vé #${t.id}: ${t.name}`, null, t.event);
   let chainRes = null;
   if (isActiveContractTicket(t)) {
     const totpTs = Number(w) * STEP;
-    chainRes = await chain.onScanTicket(t.token_id, totpTs, t.id);
+    chainRes = await chain.onScanTicket(t.token_id, totpTs, t.id, { historyIds: [scanTxId] });
+    if (chainRes?.txHash) await db.run('UPDATE txs SET tx_hash=? WHERE id=?', [chainRes.txHash, scanTxId]);
   }
-  await log(r.u.id, 'scan', 0, `Check-in vé #${t.id}: ${t.name}`, chainRes?.txHash || null, t.event);
   return { ok: 1, msg: `Check-in thành công: ${t.name} (vé #${t.id})`, tokenId: t.token_id || null, txHash: chainRes?.txHash || null, explorerUrl: chain.explorerUrl(chainRes?.txHash), chainEnabled: chain.isEnabled() };
 });
 
