@@ -117,17 +117,17 @@ function draw(){
   const totalRefunded = st.reduce((a, e) => a + (e.refunded || 0), 0);
 
   b.innerHTML=`<div class=tiles>
-   <div class=card>
+   <div class="card summary-tile music">
      <span class=tile-label>Show đang bán vé</span>
      <b>${upcomingShows.length}</b>
      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">${pastShows.length} đã diễn ra · ${cancelledShows.length} đã hủy</div>
    </div>
-   <div class=card>
+   <div class="card summary-tile crypto">
      <span class=tile-label>Vé đã phân phối (hiệu lực)</span>
      <b style="color:var(--tb-green)">${totalActiveSold}/${totalActiveCap || 0}</b>
      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">${totalRefunded > 0 ? `Đã hoàn lại ${totalRefunded} vé (show hủy)` : `Tỷ lệ lấp đầy ${totalActiveCap ? Math.round(totalActiveSold / totalActiveCap * 100) : 0}%`}</div>
    </div>
-   <div class=card>
+   <div class="card summary-tile indie">
      <span class=tile-label>Doanh thu thực nhận (95%)</span>
      <b style="color:var(--tb-green)">${vnd(totalActiveRev)}</b>
      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">${cancelledShows.length > 0 ? 'Đã khấu trừ hoàn tiền các show hủy' : 'Đã trừ 5% phí sàn trên mỗi vé'}</div>
@@ -338,7 +338,7 @@ function renderMultiSvgOnly(){
   vals.forEach((v,i)=>{
    const isH=hoverDayIdx===i;
    if(v>0||isH||days.length<=14){
-    linesSvg+=`<circle cx="${xAt(i)}" cy="${yAt(v)}" r="${isH?5.5:3.3}" fill="${col}" stroke="#ffffff" stroke-width="1.6"/>`;
+    linesSvg+=`<circle cx="${xAt(i)}" cy="${yAt(v)}" r="${isH?5.5:3.3}" fill="${col}" stroke="var(--surface)" stroke-width="1.6"/>`;
    }
   });
  });
@@ -346,7 +346,7 @@ function renderMultiSvgOnly(){
  let hoverLine='';
  if(hoverDayIdx!==null&&hoverDayIdx<days.length){
   const hx=xAt(hoverDayIdx);
-  hoverLine=`<line x1="${hx}" y1="${padT}" x2="${hx}" y2="${padT+plotH}" stroke="#0f172a" stroke-opacity="0.25" stroke-width="1.5"/>`;
+  hoverLine=`<line x1="${hx}" y1="${padT}" x2="${hx}" y2="${padT+plotH}" stroke="var(--text-muted)" stroke-opacity="0.7" stroke-width="1.5"/>`;
  }
 
  const colW=plotW/days.length;
@@ -399,7 +399,7 @@ function renderSingleShowCard(){
   const isH=singleHoverIdx===i;
   barsSvg+=`<rect x="${cx-barW/2}" y="${by}" width="${barW}" height="${bh}" rx="4" fill="${col}" fill-opacity="${isH?'0.55':'0.28'}" stroke="${col}" stroke-width="${isH?'2':'1.2'}"/>`;
   if(pt.qty>0||isH){
-   barsSvg+=`<text x="${cx}" y="${Math.max(13,by-5)}" text-anchor="middle" fill="#0f172a" font-size="11" font-weight="700">${pt.qty}</text>`;
+   barsSvg+=`<text x="${cx}" y="${Math.max(13,by-5)}" text-anchor="middle" fill="var(--dark-heading)" font-size="11" font-weight="700">${pt.qty}</text>`;
   }
   if(series.length<=15||i%2===0||i===series.length-1){
    const [,mm,dd]=pt.day.split('-');
@@ -479,13 +479,13 @@ function list(){
   const th=bannerTheme(e.name),db=parseDateBadge(e.date),imgUrl=getEventImg(e);
   const cls=classifyShow(e),isCancelled=cls==='cancelled',isPast=cls==='past';
   const tagHtml = isCancelled
-    ? '<span class="poster-tag out" style="background:#ef4444"> ĐÃ HỦY SHOW</span>'
+    ? '<span class="poster-tag out"> ĐÃ HỦY SHOW</span>'
     : isPast
       ? '<span class="poster-tag" style="background:#475569"> ĐÃ DIỄN RA</span>'
       : `<span class="poster-tag ${e.remain>0?'':'out'}">${e.remain>0?`Còn ${e.remain}/${e.total} vé`:'SOLD OUT'}</span>`;
 
-  return `<article class=card style="${isCancelled?'opacity:0.92;border-color:#fca5a5':''}">
-   <div class="event-poster ${th.cls}" style="background-image:linear-gradient(180deg, rgba(15,23,42,0.15) 0%, rgba(15,23,42,0.75) 100%), url('${esc(imgUrl)}')">
+  return `<article class="card event-card ${th.cls}" style="${isCancelled?'border-color:var(--negative)':''}">
+   <div class="event-poster ${th.cls}" style="background-image:linear-gradient(180deg, rgba(15,23,42,0.15) 0%, rgba(15,23,42,0.35) 100%), url('${esc(imgUrl)}')">
     <div class=event-poster-overlay></div>
     <div class=date-badge>
      <div class=month>${db.m}</div>
@@ -500,7 +500,7 @@ function list(){
      <div class=event-details-row> <span>${dmy(e.date)}</span></div>
      <div class=event-details-row> <span>${esc(e.venue)}</span></div>
      ${e.max_per_user>0?`<div class=event-details-row> <span>Giới hạn: <b>Tối đa ${e.max_per_user} vé/tài khoản</b></span></div>`:''}
-     ${isCancelled?`<div class=event-details-row><span style="color:#ef4444;font-weight:600"> Show đã hủy · Hoàn tiền 100% cho khán giả</span></div>`:''}
+     ${isCancelled?`<div class=event-details-row><span style="color:var(--negative);font-weight:600"> Show đã hủy · Hoàn tiền 100% cho khán giả</span></div>`:''}
     </div>
     <div class=card-action-bar style="border-top:none;padding-top:4px">
      <div class=price-block>
@@ -514,7 +514,7 @@ function list(){
        <span>Đã bán<b>0/${e.total}</b></span>
        <span>Hoàn trả<b>${e.refunded || 0} vé</b></span>
        <span>Doanh thu<b>0đ</b></span>
-       <span>Trạng thái<b style="color:#ef4444">Đã hủy</b></span>
+       <span>Trạng thái<b style="color:var(--negative)">Đã hủy</b></span>
      ` : `
        <span>Đã bán<b>${e.sold}/${e.total}</b></span>
        <span>Còn lại<b>${e.remain}</b></span>
@@ -550,13 +550,13 @@ function viewOrgDetail(id){
   </div>
   <h2>${esc(e.name)} ${isCancelled?'<span class="badge out"> Đã hủy show</span>':isPast?'<span class=badge> Đã diễn ra</span>':''}</h2>
   <table class=info>
-   <tr><th>Trạng thái</th><td>${isCancelled?'<b style="color:#ef4444">Đã hủy show (Đã hoàn 100% tiền vé cho khán giả)</b>':isPast?'<span class=badge>Đã diễn ra</span>':'<span class="badge ok">Đang mở bán</span>'}</td></tr>
+   <tr><th>Trạng thái</th><td>${isCancelled?'<b style="color:var(--negative)">Đã hủy show (Đã hoàn 100% tiền vé cho khán giả)</b>':isPast?'<span class=badge>Đã diễn ra</span>':'<span class="badge ok">Đang mở bán</span>'}</td></tr>
    <tr><th>Ngày tổ chức</th><td>${dmy(e.date)}</td></tr>
    <tr><th>Địa điểm</th><td>${esc(e.venue)}</td></tr>
    <tr><th>Giới hạn mua</th><td>${e.max_per_user>0?`<b>Tối đa ${e.max_per_user} vé / tài khoản</b>`:'Không giới hạn'}</td></tr>
    <tr><th>Giá vé</th><td><b style="color:var(--tb-green);font-size:16px">${vnd(e.price)}</b></td></tr>
    <tr><th>Số lượng vé</th><td>${e.total} vé</td></tr>
-   <tr><th>Vé đã phân phối</th><td><b>${e.sold}/${e.total}</b> vé ${isCancelled ? `<span class="note" style="color:#ef4444">(Đã hoàn trả ${e.refunded || 0} vé)</span>` : ''}</td></tr>
+   <tr><th>Vé đã phân phối</th><td><b>${e.sold}/${e.total}</b> vé ${isCancelled ? `<span class="note" style="color:var(--negative)">(Đã hoàn trả ${e.refunded || 0} vé)</span>` : ''}</td></tr>
    <tr><th>Doanh thu thực nhận (95%)</th><td><b style="color:var(--tb-green);font-size:16px">${vnd(e.revenue)}</b> ${isCancelled?'<span class="note">(0đ - Doanh thu đã hoàn trả 100% cho khán giả)</span>':''}</td></tr>
    <tr><th>Đã check-in</th><td><b>${e.checked}</b> vé</td></tr>
    <tr><th>Đang rao bán lại</th><td><b>${e.listed}</b> vé</td></tr>
@@ -577,7 +577,7 @@ function confirmCancelShow(id){
  const e = st.find(x => x.id === id); if(!e) return;
  openModal(`<h2> Xác nhận HỦY SHOW DIỄN</h2>
   <div style="background:rgba(239,68,68,0.08);border:1px solid #ef4444;border-radius:12px;padding:16px;margin:14px 0">
-   <b style="color:#ef4444;font-size:16px"> CẢNH BÁO QUAN TRỌNG:</b>
+   <b style="color:var(--negative);font-size:16px"> CẢNH BÁO QUAN TRỌNG:</b>
    <p style="margin:8px 0 0;font-size:14px;line-height:1.6">
     Hành động hủy show là <b>không thể hoàn tác</b>. Khi xác nhận:<br>
     • Hệ thống tự động kích hoạt Escrow hoàn <b>100% tiền vé</b> về ví của tất cả khán giả đã mua.<br>

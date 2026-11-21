@@ -170,6 +170,27 @@ async function _migrate(db) {
     }
   }
 
+  // Enforce new contact assignments atomically, including concurrent signups.
+  // Triggers preserve legacy accounts even if old data already has duplicates.
+  await db.run('CREATE INDEX IF NOT EXISTS users_email_normalized ON users(lower(trim(email)))');
+  await db.run('CREATE INDEX IF NOT EXISTS users_phone_normalized ON users(trim(phone))');
+  for (const operation of ['INSERT', 'UPDATE OF email,phone']) {
+    const name = operation === 'INSERT' ? 'insert' : 'update';
+    await db.run(`CREATE TRIGGER IF NOT EXISTS users_unique_contacts_${name}
+      BEFORE ${operation} ON users BEGIN
+        SELECT RAISE(ABORT, 'EMAIL_ALREADY_USED') WHERE trim(coalesce(NEW.email,''))<>''
+          AND EXISTS(SELECT 1 FROM users WHERE lower(trim(email))=lower(trim(NEW.email)) AND id<>NEW.id);
+        SELECT RAISE(ABORT, 'PHONE_ALREADY_USED') WHERE trim(coalesce(NEW.phone,''))<>''
+          AND EXISTS(SELECT 1 FROM users WHERE trim(phone)=trim(NEW.phone) AND id<>NEW.id);
+      END`);
+  }
+  await db.run(`CREATE TRIGGER IF NOT EXISTS users_unique_verified_email
+    BEFORE UPDATE OF email_verified ON users WHEN NEW.email_verified=1 BEGIN
+      SELECT RAISE(ABORT, 'EMAIL_ALREADY_USED') WHERE EXISTS(
+        SELECT 1 FROM users WHERE lower(trim(email))=lower(trim(NEW.email)) AND id<>NEW.id AND email_verified=1
+      );
+    END`);
+
   // Backfill created_at cho vé cũ chưa có ngày tạo (dựa theo lịch sử txs nếu khớp)
   const missingCreated = await db.all('SELECT t.id, t.event, e.name as event_name FROM tickets t LEFT JOIN events e ON e.id = t.event WHERE t.created_at IS NULL');
   if (missingCreated.length) {

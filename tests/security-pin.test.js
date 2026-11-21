@@ -23,9 +23,9 @@ test('six-digit security PIN and protected ticket access', async t => {
     });
     return { status: response.status, body: await response.json(), cookie: response.headers.get('set-cookie')?.split(';')[0] };
   };
-  const profile = { username: 'pin_test_user', password: 'ExamplePass1', pin: '043682', pinConfirmation: '043682', email: 'pin-test@example.com', phone: '0901234567', bank: 'VCB - 123456789', role: 'customer' };
-  const login = async (pin = '043682') => {
-    const result = await request('login', { username: profile.username, password: profile.password, pin });
+  const profile = { username: 'pin_test_user', password: 'ExamplePass1', pin: '043682', pinConfirmation: '043682', email: 'pin-test@example.com', phone: '0905550101', bank: 'VCB - 123456789', role: 'customer' };
+  const login = async () => {
+    const result = await request('login', { username: profile.username, password: profile.password });
     assert.equal(result.status, 200);
     assert.ok(result.cookie);
     cookie = result.cookie;
@@ -42,11 +42,13 @@ test('six-digit security PIN and protected ticket access', async t => {
       assert.notEqual(user.pin_hash, profile.pin);
       assert.ok(user.pin_salt);
     });
-    await t.test('password alone cannot create a session for a PIN-protected account', async () => {
+    await t.test('login uses username/password only and never asks for or checks PIN', async () => {
       const result = await request('login', { username: profile.username, password: profile.password });
-      assert.equal(result.body.pinRequired, true);
-      assert.equal(result.cookie, undefined);
-      assert.equal((await request('login', { username: profile.username, password: profile.password, pin: '999999' })).status, 422);
+      assert.equal(result.status, 200);
+      assert.equal(Object.hasOwn(result.body, 'pinRequired'), false);
+      assert.ok(result.cookie);
+      assert.equal((await request('login', { username: profile.username, password: 'wrong' })).status, 401);
+      assert.equal((await request('login', { username: profile.username, password: profile.password, pin: '999999' })).status, 200);
       await login();
       const me = (await request('me')).body;
       assert.equal(me.pinConfigured, true);
@@ -84,6 +86,42 @@ test('six-digit security PIN and protected ticket access', async t => {
       assert.equal((await request(path + '/unlock', { pin: profile.pin })).status, 403);
       await login();
     });
+    await t.test('password change requires a separate PIN grant once, plus password and email OTP', async () => {
+      await db.run('UPDATE users SET email_verified=1 WHERE id=?', [user.id]);
+      const body = { currentPassword: profile.password, newPassword: 'ChangedPass2', code: '000000' };
+      for (const endpoint of ['request', 'confirm']) assert.equal((await request('change-password/' + endpoint, body)).status, 403);
+      assert.equal((await request('change-password/unlock', { pin: '999999' })).status, 422);
+      const unlocked = await request('change-password/unlock', { pin: profile.pin });
+      assert.equal(unlocked.status, 200);
+      const passwordGrant = unlocked.body.unlockToken;
+      const headers = { 'X-Password-Unlock': passwordGrant };
+      const qrGrant = (await request(path + '/unlock', { pin: profile.pin })).body.unlockToken;
+      assert.equal((await request(path, undefined, { 'X-Ticket-Unlock': passwordGrant })).status, 403);
+      assert.equal((await request('change-password/request', body, { 'X-Password-Unlock': qrGrant })).status, 403);
+      assert.equal((await request('change-password/request', body, { 'X-Password-Unlock': passwordGrant + 'x' })).status, 403);
+      const data = JSON.parse(Buffer.from(passwordGrant.split('.')[0], 'base64url'));
+      data.exp = Date.now() - 1;
+      const payload = Buffer.from(JSON.stringify(data)).toString('base64url');
+      const expired = payload + '.' + crypto.createHmac('sha256', process.env.SECRET).update(payload).digest('hex');
+      assert.equal((await request('change-password/request', body, { 'X-Password-Unlock': expired })).status, 403);
+      let delivered;
+      mailer.isSmtpConfigured = () => true;
+      mailer.sendOtpEmail = async value => { delivered = value; return { mode: 'smtp' }; };
+      try {
+        assert.equal((await request('change-password/request', { currentPassword: 'wrong' }, headers)).status, 422);
+        assert.equal((await request('change-password/request', body, headers)).status, 200);
+        assert.equal(delivered.purpose, 'change_password');
+        assert.equal(delivered.to, profile.email);
+        body.code = delivered.code;
+        assert.equal((await request('change-password/confirm', body)).status, 403);
+        assert.equal((await request('change-password/confirm', body, headers)).status, 200);
+        profile.password = body.newPassword;
+        assert.equal((await request('change-password/request', { currentPassword: profile.password }, headers)).status, 403);
+        const nextGrant = (await request('change-password/unlock', { pin: profile.pin })).body.unlockToken;
+        await login();
+        assert.equal((await request('change-password/request', { currentPassword: profile.password }, { 'X-Password-Unlock': nextGrant })).status, 403);
+      } finally { mailer.sendOtpEmail = send; mailer.isSmtpConfigured = configured; }
+    });
     await t.test('changing PIN requires password plus old PIN and revokes QR grants', async () => {
       grant = (await request(path + '/unlock', { pin: profile.pin })).body.unlockToken;
       const body = { currentPassword: profile.password, oldPin: profile.pin, pin: '057924', pinConfirmation: '057924' };
@@ -102,9 +140,10 @@ test('six-digit security PIN and protected ticket access', async t => {
       assert.equal(row.pin_attempts, 5);
       assert.ok(row.pin_locked_until > Date.now());
       cookie = '';
-      assert.equal((await request('login', { username: profile.username, password: profile.password, pin: '057924' })).status, 429);
+      await login();
+      assert.equal((await request('security/pin/verify', { pin: '057924' })).status, 429);
       await db.run('UPDATE users SET pin_locked_until=? WHERE id=?', [Date.now() - 1, user.id]);
-      await login('057924');
+      assert.equal((await request('security/pin/verify', { pin: '057924' })).status, 200);
     });
     await t.test('PIN recovery requires password and real email OTP, including when logged out', async () => {
       await db.run('UPDATE users SET email_verified=1 WHERE id=?', [user.id]);
@@ -123,11 +162,14 @@ test('six-digit security PIN and protected ticket access', async t => {
       assert.equal((await request('security/pin/reset/confirm', { ...reset, code: 'abcdef' })).status, 400);
       assert.equal((await request('security/pin/reset/confirm', reset)).status, 200);
       assert.equal((await request('security/pin/reset/confirm', reset)).status, 400);
-      await login('006532');
+      await login();
     });
     await t.test('legacy users choose their own PIN and cannot overwrite an existing one', async () => {
       cookie = (await request('login', { username: 'demo_customer', password: 'Demo@2025' })).cookie;
       assert.equal((await request('me')).body.pinConfigured, false);
+      mailer.isSmtpConfigured = () => true;
+      mailer.sendOtpEmail = async () => ({ mode: 'smtp' });
+      assert.equal((await request('change-password/request', { currentPassword: 'Demo@2025' })).status, 200);
       const body = { currentPassword: 'Demo@2025', pin: '004123', pinConfirmation: '004123' };
       assert.equal((await request('security/pin/setup', { ...body, currentPassword: 'wrong' })).status, 422);
       assert.equal((await request('security/pin/setup', body)).status, 200);
