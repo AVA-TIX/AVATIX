@@ -443,6 +443,8 @@ route('post', 'events', 'organizer', async r => {
 
 async function cancelEventAndRefund(ev, { byAdmin = false, adminId = null } = {}) {
   if (ev.status === 'cancelled') throw E('Sự kiện này đã được hủy trước đó rồi');
+  const todayVn = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+  if (String(ev.date || '') < todayVn) throw E('Không thể hủy show đã diễn ra');
 
   const tickets = await db.all('SELECT * FROM tickets WHERE event=? AND used != 2', [ev.id]);
   let totalRefund = 0;

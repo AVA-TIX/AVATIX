@@ -277,7 +277,9 @@ function drawEventList(){
   const evBadge=e=>e.lifecycle==='cancelled'?'<span class="badge out">Đã hủy</span>':e.lifecycle==='past'?'<span class=badge>Đã diễn ra</span>':'<span class="badge ok">Đang bán vé</span>';
   const evAction=e=>e.lifecycle==='cancelled'
     ?'<span class=note>Đã hoàn tiền</span>'
-    :`<button class="btn sm ghost red" onclick="cancelShowByAdmin(${e.id},'${esc(e.name).replace(/'/g,"&#39;")}',${e.sold})">🚫 Hủy &amp; Hoàn tiền</button>`;
+    :e.lifecycle==='past'
+      ?'<span class=note>Đã kết thúc</span>'
+      :`<button class="btn sm ghost red" onclick="cancelShowByAdmin(${e.id},'${esc(e.name).replace(/'/g,"&#39;")}',${e.sold})">🚫 Hủy &amp; Hoàn tiền</button>`;
 
   const desktop=`<div class="card tbl-wrap hist-desktop"><table class=hist>
     <thead><tr><th>Sự kiện</th><th>Ban tổ chức</th><th>Giá / Vé bán</th><th>Doanh thu BTC (95%)</th><th>Phí sàn (5%)</th><th>Trạng thái</th><th>Kiểm duyệt</th></tr></thead>
@@ -304,7 +306,7 @@ function drawEventList(){
         BTC nhận: <b style="color:var(--tb-green)">${vnd(e.revenue)}</b> · Phí sàn 5%: <b>${vnd(e.platformFee)}</b>
       </div>
       <div class=hist-card-foot>
-        <span>${e.lifecycle==='cancelled'?`Đã hoàn ${e.refunded} vé`:'Đang hiển thị trên sàn'}</span>
+        <span>${e.lifecycle==='cancelled'?`Đã hoàn ${e.refunded} vé`:e.lifecycle==='past'?'Show đã kết thúc':'Đang mở bán trên sàn'}</span>
         <div>${evAction(e)}</div>
       </div>
     </div>`).join('')}</div>`;

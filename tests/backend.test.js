@@ -197,6 +197,10 @@ test('account avatar and email-only OTP API', async t => {
         assert.equal(cancelRes.body.totalRefund, 200000);
         assert.equal((await db.get("SELECT balance FROM users WHERE username='demo_customer'")).balance, custBefore);
         assert.equal((await db.get('SELECT status FROM events WHERE id=?', [evRow.id])).status, 'cancelled');
+
+        // Past events cannot be cancelled by admin or organizer
+        const pastIns = await db.run("INSERT INTO events(org,name,date,venue,price,total,remain,status) VALUES(?,'Past Event','2026-01-01','HCM',100000,10,10,'active')", [target.id]);
+        assert.equal((await callAs(`admin/events/${pastIns.lastInsertRowid}/cancel`, {}, adminCookie)).status, 400);
       } finally {
         delete process.env.DEMO_OTP_BYPASS;
         prevAdminUser === undefined ? delete process.env.ADMIN_USER : (process.env.ADMIN_USER = prevAdminUser);
