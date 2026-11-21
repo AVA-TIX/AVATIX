@@ -2,7 +2,7 @@
   <img src="public/logo.jpg" alt="AVA-TIX Logo" width="400" />
 </p>
 
-<h1 align="center">AVA-TIX — Nền tảng Phân phối &amp; Quản trị Vé Sự kiện trên Avalanche</h1>
+<h1 align="center">AVA-TIX - Nền tảng Phân phối &amp; Quản trị Vé Sự kiện trên Avalanche</h1>
 
 <p align="center">
   <b>Đề án dự thi UniHack Avalanche 2026</b><br/>
